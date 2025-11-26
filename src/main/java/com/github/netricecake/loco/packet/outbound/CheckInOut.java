@@ -1,0 +1,45 @@
+package com.github.netricecake.loco.packet.outbound;
+
+import com.github.netricecake.kakao.KakaoApi;
+import com.github.netricecake.loco.util.BsonUtil;
+import com.google.gson.JsonObject;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class CheckInOut {
+
+    private long userId;
+
+    private String os = KakaoApi.AGENT;
+
+    private int ntype = KakaoApi.NETWORK_TYPE;
+
+    private String appVer = KakaoApi.VERSION;
+
+    private String lang =  KakaoApi.LANGUAGE;
+
+    private String MCCMNC = KakaoApi.MCCMNC;
+
+    public CheckInOut(long userId) {
+        this.userId = userId;
+    }
+
+    public String getMethod() {
+        return "CHECKIN";
+    }
+
+    public byte[] toBson() {
+        JsonObject checkInObject = new JsonObject();
+        checkInObject.addProperty("userId", userId);
+        checkInObject.addProperty("os", os);
+        checkInObject.addProperty("ntype", ntype);
+        checkInObject.addProperty("appVer", appVer);
+        checkInObject.addProperty("lang", lang);
+        checkInObject.addProperty("MCCMNC", MCCMNC);
+
+        return BsonUtil.jsonObjectToBson(checkInObject);
+    }
+
+}
