@@ -15,7 +15,7 @@ public class Main {
     static String email = "invalid@example.com";
     static String password = "example";
     static String deviceName = "SM-X930"; // 갤럭시 탭 s11 울트라,   지원되는 태블릿 모델명 넣으세요
-    static String deviceUuid = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // 64자 랜덤 hex-string
+    static String deviceUuid = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // 64자 랜덤 hex-string, 이것도 에시니까 무조건 다른걸로 바꾸세요.
 
     public static void main(String[] args) throws Exception {
         TalkClient client = new TalkClient(email, password, deviceName, deviceUuid, new TalkHandler() {
