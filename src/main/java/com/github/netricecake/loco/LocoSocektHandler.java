@@ -1,13 +1,13 @@
 package com.github.netricecake.loco;
 
-public interface LocoSocektHandler {
+public class LocoSocektHandler {
 
-    void onPacket(LocoPacket packet);
+    public void onPacket(LocoPacket packet) {}
 
-    void onConnect();
+    public void onConnect() {}
 
-    void onDisconnect();
+    public void onDisconnect() {}
 
-    void onError(Exception e);
+    public void onError(Exception e) {}
 
 }

@@ -1,5 +1,6 @@
 package com.github.netricecake.kakao;
 
+import com.github.netricecake.kakao.exception.*;
 import com.github.netricecake.kakao.structs.ChatRoom;
 import com.github.netricecake.loco.LocoPacket;
 import com.github.netricecake.loco.LocoSocektHandler;
@@ -18,6 +19,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Getter;
 
+import java.awt.print.Book;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -39,7 +41,7 @@ public class TalkClient {
     private Map<Long, ChatRoom> chatRooms = new HashMap<>();
 
     @Getter
-    private boolean connected;
+    protected boolean connected;
 
     private KakaoApi.LoginData loginData;
     private GetConfIn bookingData;
@@ -54,7 +56,7 @@ public class TalkClient {
     @Getter
     private LocoSocket socket;
 
-    public TalkClient(String email, String password, String deviceName, String deviceUuid, TalkHandler talkHandler) {
+    public TalkClient(String email, String password, String deviceName, String deviceUuid, TalkHandler talkHandler) throws IOException {
         this.email = email;
         this.password = password;
         this.deviceName = deviceName;
@@ -63,77 +65,48 @@ public class TalkClient {
         this.talkHandler = talkHandler;
         talkHandler.setTalkClient(this);
 
-        new File(sessionDir).mkdir();
-        loginData = readLoginData();
+        new File(sessionDir).mkdirs();
+        File loginDataFile = new File(sessionDir + "loginData.json");
+        if (!loginDataFile.exists()) return;
+        String loginDataJson = Files.readString(Paths.get(loginDataFile.getAbsolutePath()));
+        loginData = new KakaoApi.LoginData(loginDataJson);
     }
 
-    public void connect() throws Exception {
-        if (this.connected) throw new Exception("이미 연결되어 있습니다.");
-        if (loginData == null) {
-            System.out.println("로그인 데이터가 없습니다. 새로 로그인을 시도합니다.");
-            try {
-                loginData = KakaoApi.loginRequest(email, password, deviceName, deviceUuid);
-            } catch (IllegalStateException e) {
-                Map.Entry<String, Integer> registerInfo = KakaoApi.generatePasscode(email, password, deviceName, deviceUuid);
-                System.out.println("기기 등록이 필요합니다.");
-                System.out.println("카카오톡 앱에서 " + registerInfo.getValue() + "초 안에 코드를 입력해주세요. 코드 : " + registerInfo.getKey());
-                boolean registerResult = KakaoApi.registerDevice(email, password, deviceUuid);
-                if (!registerResult) throw new IllegalStateException("기기등록 실패");
-                System.out.println("기기 등록 성공");
-                loginData = KakaoApi.loginRequest(email, password, deviceName, deviceUuid);
-            }
-            System.out.println("로그인이 완료되었습니다.");
-            writeLoginData();
+    public void connect() throws IOException, InvalidDeviceNameException, InvalidDeviceUUIDException, BadCredentialsException, UnregisteredDeviceException, BookingFailedException, LoginFailedException {
+        if (this.connected) throw new IOException("Already connected.");
+        if (loginData == null) { // 저장된 로그인 데이터가 없는 경우 로그인 시도
+            loginData = KakaoApi.loginRequest(email, password, deviceName, deviceUuid);
+            File loginDataFile = new File(sessionDir + "loginData.json");
+            if (!loginDataFile.exists()) loginDataFile.createNewFile();
+            Files.write(Paths.get(loginDataFile.getAbsolutePath()), loginData.toJson().getBytes());
         }
 
         bookingData = KakaoApi.getBookingData(loginData.userId);
+        if (bookingData == null || bookingData.getStatus() != 0) throw new BookingFailedException();
 
         LocoSocket checkInSocket = new LocoSocket(bookingData.getAddr(), bookingData.getPort(), new LocoSocektHandler() {
-            @Override
-            public void onPacket(LocoPacket packet) {
-
-            }
-
-            @Override
-            public void onConnect() {
-
-            }
-
-            @Override
-            public void onDisconnect() {
-
-            }
-
             @Override
             public void onError(Exception e) {
                 e.printStackTrace();
             }
         }, Executors.newFixedThreadPool(1));
-        CheckInOut checkInRequest = new CheckInOut(loginData.userId);
-        byte[] body = checkInRequest.toBson();
+        byte[] body = new CheckInOut(loginData.userId).toBson();
         checkInSocket.connect();
-        LocoPacket checkinResponse = checkInSocket.writeAndRead(new LocoPacket(1000, checkInRequest.getMethod(), body));
-        checkInData = new CheckInIn();
-        checkInData.fromBson(checkinResponse.getBody());
+        LocoPacket checkinResponse = checkInSocket.writeAndRead(new LocoPacket(1000, "CHECKIN", body));
+        checkInData = new CheckInIn(checkinResponse.getBody());
         checkInSocket.close();
-
-
 
         long lastTokenId = 0;
         long lbk = 0;
         byte[] rp = ByteUtil.hexStringToByteArray("0000ffff0000");
 
-        try {
-            File loginListDataFile = new File(sessionDir + "loginListData.json");
-            if (loginListDataFile.exists()) {
-                String loginDataJson = Files.readString(Paths.get(loginListDataFile.getAbsolutePath()));
-                JsonObject loginListData = JsonParser.parseString(loginDataJson).getAsJsonObject();
-                lastTokenId = loginListData.getAsJsonPrimitive("lastTokenId").getAsLong();
-                lbk = loginListData.getAsJsonPrimitive("lbk").getAsLong();
-                rp = ByteUtil.hexStringToByteArray("0100ffff0100"); // 이게 도당체 뭐임
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+        File loginListDataFile = new File(sessionDir + "loginListData.json");
+        if (loginListDataFile.exists()) {
+            String loginDataJson = Files.readString(Paths.get(loginListDataFile.getAbsolutePath()));
+            JsonObject loginListData = JsonParser.parseString(loginDataJson).getAsJsonObject();
+            lastTokenId = loginListData.getAsJsonPrimitive("lastTokenId").getAsLong();
+            lbk = loginListData.getAsJsonPrimitive("lbk").getAsLong();
+            rp = ByteUtil.hexStringToByteArray("0100ffff0100"); // 이게 도대체 뭐임
         }
 
         locoHandlerPool = Executors.newFixedThreadPool(1);
@@ -149,21 +122,16 @@ public class TalkClient {
         loginListData = new LoginListIn();
         loginListData.fromBson(socket.writeAndRead(new LocoPacket("LOGINLIST", req.toBson())).getBody());
         if (loginListData.getStatus() != 0) {
-            System.out.println("카카오톡 서버와 연결을 실패했습니다. 로그인 정보 파일을 삭제 후 다시 시도해보세요.");
-            throw new Exception("카카오톡 서버와 연결을 실패했습니다. 로그인 정보 파일을 삭제 후 다시 시도해보세요.");
+            throw new LoginFailedException();
         }
-        System.out.println("연결 성공");
 
-        try {
-            File loginListDataFile = new File(sessionDir + "loginListData.json");
-            if (!loginListDataFile.exists()) loginListDataFile.createNewFile();
-            JsonObject jsonObject = new JsonObject();
-            jsonObject.addProperty("lastTokenId", loginListData.getLastTokenId());
-            jsonObject.addProperty("lbk", loginListData.getLbk());
-            Files.write(Paths.get(loginListDataFile.getAbsolutePath()), new Gson().toJson(jsonObject).getBytes());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        if (!loginListDataFile.exists()) loginListDataFile.createNewFile();
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("lastTokenId", loginListData.getLastTokenId());
+        jsonObject.addProperty("lbk", loginListData.getLbk());
+        Files.write(Paths.get(loginListDataFile.getAbsolutePath()), new Gson().toJson(jsonObject).getBytes());
+
+        connected = true;
 
         new Thread(() -> {
             try {
@@ -177,31 +145,6 @@ public class TalkClient {
                 e.printStackTrace();
             }
         });
-    }
-
-    private KakaoApi.LoginData readLoginData() {
-        try {
-            File loginDataFile = new File(sessionDir + "loginData.json");
-            if (!loginDataFile.exists()) return null;
-            String loginDataJson = Files.readString(Paths.get(loginDataFile.getAbsolutePath()));
-            KakaoApi.LoginData loginData = new KakaoApi.LoginData();
-            loginData.fromJson(loginDataJson);
-            return loginData;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return null;
-    }
-
-    private void writeLoginData() {
-        try {
-            File loginDataFile = new File(sessionDir + "loginData.json");
-            if (!loginDataFile.exists()) loginDataFile.createNewFile();
-            Files.write(Paths.get(loginDataFile.getAbsolutePath()), loginData.toJson().getBytes());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     public boolean sendMessage(ChatRoom room, int type, String message, String extra) {

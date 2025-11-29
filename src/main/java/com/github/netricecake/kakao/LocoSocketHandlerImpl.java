@@ -11,7 +11,7 @@ import com.github.netricecake.loco.packet.outbound.InfoLinkOut;
 import com.github.netricecake.loco.packet.outbound.MessageOut;
 import lombok.Getter;
 
-public class LocoSocketHandlerImpl implements LocoSocektHandler {
+public class LocoSocketHandlerImpl extends LocoSocektHandler {
 
     @Getter
     private TalkClient client;
@@ -79,7 +79,8 @@ public class LocoSocketHandlerImpl implements LocoSocektHandler {
 
     @Override
     public void onDisconnect() {
-
+        client.connected = false;
+        System.out.println("연결 끊어짐");
     }
 
     @Override

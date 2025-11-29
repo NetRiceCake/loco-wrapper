@@ -1,12 +1,13 @@
 package com.github.netricecake.loco.packet.inbound;
 
+import com.github.netricecake.loco.packet.InboundPacket;
 import com.github.netricecake.loco.util.BsonUtil;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Getter;
 
 @Getter
-public class DelMemIn {
+public class DelMemIn extends InboundPacket {
 
     private long chatId;
 

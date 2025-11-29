@@ -1,12 +1,13 @@
 package com.github.netricecake.loco.packet.inbound;
 
+import com.github.netricecake.loco.packet.InboundPacket;
 import com.github.netricecake.loco.util.BsonUtil;
 import com.google.gson.JsonObject;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
-public class CheckInIn {
+public class CheckInIn extends InboundPacket {
 
     private int status;
 
@@ -32,21 +33,20 @@ public class CheckInIn {
 
     private String MCCMNC;
 
-    public void fromBson(byte[] bson)
-    {
+    public CheckInIn(byte[] bson) {
         JsonObject json = BsonUtil.bsonToJsonObject(bson);
-        status = json.get("status").getAsInt();
-        host = json.get("host").getAsString();
-        host6 = json.get("host6").getAsString();
-        port = json.get("port").getAsInt();
-        cshost = json.get("cshost").getAsString();
-        cshost6 = json.get("cshost6").getAsString();
-        csport = json.get("csport").getAsInt();
-        vsshost = json.get("vsshost").getAsString();
-        vsshost6 = json.get("vsshost6").getAsString();
-        vssport = json.get("vssport").getAsInt();
-        cacheExpire = json.get("cacheExpire").getAsLong();
-        MCCMNC = json.get("MCCMNC").getAsString();
+        status = getIntOrNull(json, "status");
+        host = getStringOrNull(json, "host");
+        host6 = getStringOrNull(json, "host6");
+        port = getIntOrNull(json, "port");
+        cshost = getStringOrNull(json, "cshost");
+        cshost6 = getStringOrNull(json, "cshost6");
+        csport = getIntOrNull(json, "csport");
+        vsshost = getStringOrNull(json, "vsshost");
+        vsshost6 = getStringOrNull(json, "vsshost6");
+        vssport = getIntOrNull(json, "vssport");
+        cacheExpire = getLongOrNull(json, "cacheExpire");
+        MCCMNC = getStringOrNull(json, "MCCMNC");
     }
 
 }

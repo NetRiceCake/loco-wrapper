@@ -26,10 +26,6 @@ public class CheckInOut {
         this.userId = userId;
     }
 
-    public String getMethod() {
-        return "CHECKIN";
-    }
-
     public byte[] toBson() {
         JsonObject checkInObject = new JsonObject();
         checkInObject.addProperty("userId", userId);

@@ -1,5 +1,9 @@
 package com.github.netricecake.kakao;
 
+import com.github.netricecake.kakao.exception.BadCredentialsException;
+import com.github.netricecake.kakao.exception.InvalidDeviceNameException;
+import com.github.netricecake.kakao.exception.InvalidDeviceUUIDException;
+import com.github.netricecake.kakao.exception.UnregisteredDeviceException;
 import com.github.netricecake.loco.packet.inbound.GetConfIn;
 import com.github.netricecake.loco.packet.outbound.GetConfOut;
 import com.github.netricecake.loco.util.ByteUtil;
@@ -48,9 +52,9 @@ public class KakaoApi {
 
     private final static Gson gson = new Gson();
 
-    public static LoginData loginRequest(String email, String password, String deviceName, String deviceUuid) throws IOException, InvalidParameterException, IllegalStateException {
-        if (deviceUuid == null || deviceUuid.length() != UUID_LENGTH) throw new InvalidParameterException("invalid deviceUuid");
-        if (!checkAllowedDevice(deviceName)) throw new InvalidParameterException("This device does not support sub device login");
+    public static LoginData loginRequest(String email, String password, String deviceName, String deviceUuid) throws IOException, InvalidDeviceNameException, InvalidDeviceUUIDException, BadCredentialsException, UnregisteredDeviceException {
+        if (deviceUuid == null || deviceUuid.length() != UUID_LENGTH) throw new InvalidDeviceUUIDException();
+        if (!checkAllowedDevice(deviceName)) throw new InvalidDeviceNameException();
         RequestBody body = new FormBody.Builder().add("password", password)
                 .add("device_name", deviceName)
                 .add("foced", "false")
@@ -68,10 +72,9 @@ public class KakaoApi {
         int status = jsonObject.get("status").getAsInt();
 
         // 12 비번 틀림 30 이메일 틀림
-        if (status == 12 || status == 30) throw new InvalidParameterException("Email or password is invalid");
-        if (status == -100) throw new IllegalStateException("Register device before login");
+        if (status == 12 || status == 30) throw new BadCredentialsException();
+        if (status == -100) throw new UnregisteredDeviceException();
         if (status == 0) {
-
             LoginData data = new LoginData();
             data.userId = jsonObject.get("userId").getAsLong();
             data.countryIso = jsonObject.get("countryIso").getAsString();
@@ -218,7 +221,7 @@ public class KakaoApi {
         public String mainDeviceAppVersion;
         public String recipe;
 
-        public void fromJson(String json) {
+        public LoginData(String json) {
             JsonObject jsonObject = JsonParser.parseString(json).getAsJsonObject();
             userId = jsonObject.get("userId").getAsLong();
             countryIso = jsonObject.get("countryIso").getAsString();
@@ -233,6 +236,8 @@ public class KakaoApi {
             mainDeviceAppVersion = jsonObject.get("mainDeviceAppVersion").getAsString();
             recipe = jsonObject.get("recipe").getAsString();
         }
+
+        public LoginData() {}
 
         public String toJson() {
             JsonObject jsonObject = new JsonObject();
