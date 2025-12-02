@@ -5,29 +5,36 @@ import com.github.netricecake.kakao.structs.ChatRoom;
 import com.github.netricecake.loco.LocoPacket;
 import com.github.netricecake.loco.LocoSocektHandler;
 import com.github.netricecake.loco.LocoSocket;
-import com.github.netricecake.loco.packet.inbound.CheckInIn;
-import com.github.netricecake.loco.packet.inbound.GetConfIn;
-import com.github.netricecake.loco.packet.inbound.LoginListIn;
-import com.github.netricecake.loco.packet.inbound.WriteIn;
-import com.github.netricecake.loco.packet.outbound.CheckInOut;
-import com.github.netricecake.loco.packet.outbound.LoginListOut;
-import com.github.netricecake.loco.packet.outbound.PingOut;
-import com.github.netricecake.loco.packet.outbound.WriteOut;
+import com.github.netricecake.loco.packet.inbound.login.CheckInIn;
+import com.github.netricecake.loco.packet.inbound.login.GetConfIn;
+import com.github.netricecake.loco.packet.inbound.login.LoginListIn;
+import com.github.netricecake.loco.packet.inbound.message.PostIn;
+import com.github.netricecake.loco.packet.inbound.message.ShipIn;
+import com.github.netricecake.loco.packet.inbound.message.WriteIn;
+import com.github.netricecake.loco.packet.outbound.login.CheckInOut;
+import com.github.netricecake.loco.packet.outbound.login.LoginListOut;
+import com.github.netricecake.loco.packet.outbound.etc.PingOut;
+import com.github.netricecake.loco.packet.outbound.message.PostOut;
+import com.github.netricecake.loco.packet.outbound.message.ShipOut;
+import com.github.netricecake.loco.packet.outbound.message.WriteOut;
+import com.github.netricecake.loco.util.BsonUtil;
 import com.github.netricecake.loco.util.ByteUtil;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Getter;
 
-import java.awt.print.Book;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class TalkClient {
 
@@ -136,7 +143,7 @@ public class TalkClient {
         new Thread(() -> {
             try {
                 while (socket.isAlive()) {
-                    Thread.sleep(10 * 60 * 1000);
+                    Thread.sleep(5 * 60 * 1000);
                     PingOut pingOut = new PingOut();
                     LocoPacket pingPacket = new LocoPacket("PING", pingOut.toBson());
                     socket.write(pingPacket);
@@ -147,9 +154,9 @@ public class TalkClient {
         });
     }
 
-    public boolean sendMessage(ChatRoom room, int type, String message, String extra) {
+    public boolean sendMessage(long chatId, int type, String message, String extra) {
         WriteOut wo = new WriteOut();
-        wo.setChatId(room.getChatId());
+        wo.setChatId(chatId);
         wo.setType(type);
         wo.setMessage(message);
         wo.setExtra(extra);
@@ -158,8 +165,59 @@ public class TalkClient {
         return wi.getStatus() == 0;
     }
 
-    public boolean sendMessage(ChatRoom room, String message) {
-        return sendMessage(room, 1, message, "{}");
+    public boolean sendMessage(long chatId, String message) {
+        return sendMessage(chatId, 1, message, "{}");
+    }
+
+    public boolean sendJpg(long chatId, byte[] image, String format, int width, int height) {
+        LocoSocket postSocket = null;
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            ShipOut so = new ShipOut();
+            so.setChatId(chatId);
+            so.setSize(image.length);
+            so.setCheckSum(ByteUtil.byteArrayToHexString(md.digest(image)));
+            ShipIn si = new ShipIn();
+            si.fromBson(socket.writeAndRead(new LocoPacket("SHIP", so.toBson())).getBody());
+            if (si.getStatus() != 0) return false;
+
+            final CompletableFuture<Integer> future = new CompletableFuture<>();
+            postSocket = new LocoSocket(si.getVhost(), si.getPort(), new LocoSocektHandler() {
+                @Override
+                public void onPacket(LocoPacket packet) {
+                    JsonObject jsonObject = BsonUtil.bsonToJsonObject(packet.getBody());
+                    int status = jsonObject.get("status").getAsInt();
+                    future.complete(status);
+                }
+            }, Executors.newFixedThreadPool(1));
+            postSocket.connect();
+
+            PostOut po =  new PostOut();
+            po.setUserId(loginData.userId);
+            po.setKey(si.getKey());
+            po.setSize(image.length);
+            po.setChatId(chatId);
+            po.setWidth(width);
+            po.setHeight(height);
+
+            PostIn pi = new PostIn();
+            pi.fromBson(postSocket.writeAndRead(new LocoPacket("POST", po.toBson())).getBody());
+            if (pi.getStatus() != 0) {
+                postSocket.close();
+                return false;
+            }
+
+            LocoPacket packet = new LocoPacket("", image);
+            packet.setRaw(true);
+            postSocket.write(packet);
+            int status = future.get();
+            postSocket.close();
+            return status == 0;
+        } catch (Exception e) {
+        } finally {
+            //if (postSocket != null) postSocket.close();
+        }
+        return false;
     }
 
 }

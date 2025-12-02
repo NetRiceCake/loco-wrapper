@@ -1,4 +1,4 @@
-package com.github.netricecake.loco.packet.inbound;
+package com.github.netricecake.loco.packet.inbound.member;
 
 import com.github.netricecake.loco.packet.InboundPacket;
 import com.github.netricecake.loco.util.BsonUtil;
@@ -7,7 +7,7 @@ import com.google.gson.JsonParser;
 import lombok.Getter;
 
 @Getter
-public class NewMemIn extends InboundPacket {
+public class DelMemIn extends InboundPacket {
 
     private long chatId;
 
@@ -20,7 +20,7 @@ public class NewMemIn extends InboundPacket {
         chatId = jsonObject.get("chatId").getAsLong();
         userId = jsonObject.get("authorId").getAsLong();
         JsonObject msgObject = JsonParser.parseString(jsonObject.get("message").getAsString()).getAsJsonObject();
-        nickname = msgObject.get("members").getAsJsonArray().get(0).getAsJsonObject().get("nickName").getAsString();
+        nickname = msgObject.get("member").getAsJsonObject().get("nickName").getAsString();
     }
 
 }

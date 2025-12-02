@@ -12,6 +12,7 @@ import io.netty.handler.codec.bytes.ByteArrayDecoder;
 import io.netty.handler.codec.bytes.ByteArrayEncoder;
 import lombok.Getter;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,7 +52,7 @@ public class LocoSocket {
         cryptoManager = new CryptoManager();
     }
 
-    public void connect() {
+    public void connect() throws IOException {
         try {
             byte[] handshakePacket = cryptoManager.generateHandshakeMessage();
             eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
@@ -92,7 +93,7 @@ public class LocoSocket {
                     }
                 }
             }.start();
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
             handlerPool.execute(() -> {
                 locoSocektHandler.onError(e);
             });
@@ -128,11 +129,12 @@ public class LocoSocket {
     }
 
     public void close() {
+        if (!alive) return;
         handlerPool.execute(() -> {
             locoSocektHandler.onDisconnect();
         });
-        channel.close();
         eventLoopGroup.shutdownGracefully();
+        channel.close();
         alive = false;
     }
 

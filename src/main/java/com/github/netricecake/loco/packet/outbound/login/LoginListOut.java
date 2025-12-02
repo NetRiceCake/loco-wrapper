@@ -1,4 +1,4 @@
-package com.github.netricecake.loco.packet.outbound;
+package com.github.netricecake.loco.packet.outbound.login;
 
 import com.github.netricecake.kakao.KakaoApi;
 import com.github.netricecake.loco.util.BsonUtil;

@@ -1,10 +1,9 @@
-package com.github.netricecake.loco.packet.inbound;
+package com.github.netricecake.loco.packet.inbound.login;
 
 import com.github.netricecake.loco.packet.InboundPacket;
 import com.github.netricecake.loco.util.BsonUtil;
 import com.google.gson.JsonObject;
 import lombok.Getter;
-import lombok.Setter;
 
 @Getter
 public class CheckInIn extends InboundPacket {

@@ -1,4 +1,4 @@
-package com.github.netricecake.loco.packet.outbound;
+package com.github.netricecake.loco.packet.outbound.room;
 
 import com.github.netricecake.loco.util.BsonUtil;
 import com.google.gson.JsonObject;

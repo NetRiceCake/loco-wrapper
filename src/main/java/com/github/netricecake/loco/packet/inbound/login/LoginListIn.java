@@ -1,4 +1,4 @@
-package com.github.netricecake.loco.packet.inbound;
+package com.github.netricecake.loco.packet.inbound.login;
 
 import com.github.netricecake.loco.packet.InboundPacket;
 import com.github.netricecake.loco.util.BsonUtil;
@@ -15,7 +15,7 @@ public class LoginListIn extends InboundPacket {
 
     private long userId;
 
-    private int revision;
+    private long revision;
 
     private String revisionInfo;
 
@@ -23,7 +23,7 @@ public class LoginListIn extends InboundPacket {
 
     private long minLogId;
 
-    private int sb;
+    private long sb;
 
     private JsonArray chatDatas;
 
@@ -31,7 +31,7 @@ public class LoginListIn extends InboundPacket {
 
     private JsonArray kc;
 
-    private int mcmRevision;
+    private long mcmRevision;
 
     private long lastTokenId;
 
@@ -46,23 +46,24 @@ public class LoginListIn extends InboundPacket {
     public void fromBson(byte[] bson) {
         JsonObject json = BsonUtil.bsonToJsonObject(bson);
         status = json.get("status").getAsInt();
-        try {
-            userId = json.get("userId").getAsLong();
-            revision = json.get("revision").getAsInt();
-            revisionInfo = json.get("revisionInfo").getAsString();
+        userId = getLongOrNull(json, "userId");
+        revision = getLongOrNull(json, "revision");
+        revisionInfo = getStringOrNull(json, "revisionInfo");
+        minLogId = getLongOrNull(json, "minLogId");
+        sb = getLongOrNull(json, "sb");
+        mcmRevision = getLongOrNull(json, "mcmRevision");
+        lastTokenId = getLongOrNull(json, "lastTokenId");
+        lastChatId = getLongOrNull(json, "lastChatId");
+        ltk = getLongOrNull(json, "ltk");
+        lbk = getLongOrNull(json, "lbk");
+        eof = getBoolOrNull(json, "eof");
+
+        if (status == 0) {
             rp = Base64.getDecoder().decode(json.get("rp").getAsJsonObject().get("$binary").getAsJsonObject().get("base64").getAsString());
-            minLogId = json.get("minLogId").getAsLong();
-            sb = json.get("sb").getAsInt();
             chatDatas = json.get("chatDatas").getAsJsonArray();
             delChatIds = json.get("delChatIds").getAsJsonArray();
             kc = json.get("kc").getAsJsonArray();
-            mcmRevision = json.get("mcmRevision").getAsInt();
-            lastTokenId = json.get("lastTokenId").getAsLong();
-            lastChatId = json.get("lastChatId").getAsLong();
-            ltk = json.get("ltk").getAsLong();
-            lbk = json.get("lbk").getAsLong();
-            eof = json.get("eof").getAsBoolean();
-        } catch(Exception e) {}
+        }
     }
 
 }

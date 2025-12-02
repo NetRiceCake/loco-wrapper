@@ -7,6 +7,8 @@ import lombok.Setter;
 @Setter
 public class LocoPacket {
 
+    private boolean raw = false;
+
     private int packetId;
 
     private short statusCode;

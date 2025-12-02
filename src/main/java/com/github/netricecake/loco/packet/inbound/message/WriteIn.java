@@ -1,4 +1,4 @@
-package com.github.netricecake.loco.packet.inbound;
+package com.github.netricecake.loco.packet.inbound.message;
 
 import com.github.netricecake.loco.packet.InboundPacket;
 import com.github.netricecake.loco.util.BsonUtil;

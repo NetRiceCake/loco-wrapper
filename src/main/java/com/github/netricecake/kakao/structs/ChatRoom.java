@@ -3,6 +3,9 @@ package com.github.netricecake.kakao.structs;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Getter
 @Setter
 public class ChatRoom {
@@ -15,6 +18,6 @@ public class ChatRoom {
 
     private long linkId;
 
-    //private Map<Long, Member> members = new HashMap<>();
+    private Map<Long, Member> members = new HashMap<>();
 
 }

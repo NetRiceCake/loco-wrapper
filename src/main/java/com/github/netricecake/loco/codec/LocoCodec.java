@@ -23,14 +23,18 @@ public class LocoCodec extends MessageToMessageCodec<byte[], LocoPacket> {
 
     @Override
     protected void encode(ChannelHandlerContext channelHandlerContext, LocoPacket packet, List<Object> list) throws Exception {
-        byte[] packetId = ByteUtil.intToByteArrayLE(packet.getPacketId());
-        byte[] statusCode = ByteUtil.shortToByteArrayLE(packet.getStatusCode());
-        byte[] method = new byte[11];
-        System.arraycopy(packet.getMethod().getBytes(), 0, method, 0, packet.getMethod().length());
-        byte[] bodyType = { packet.getBodyType() };
-        byte[] body = packet.getBody();
-        byte[] bodyLength = ByteUtil.intToByteArrayLE(body.length);
-        list.add(ByteUtil.concatBytes(packetId, statusCode, method, bodyType, bodyLength, body));
+        if (packet.isRaw()) {
+            list.add(packet.getBody());
+        } else {
+            byte[] packetId = ByteUtil.intToByteArrayLE(packet.getPacketId());
+            byte[] statusCode = ByteUtil.shortToByteArrayLE(packet.getStatusCode());
+            byte[] method = new byte[11];
+            System.arraycopy(packet.getMethod().getBytes(), 0, method, 0, packet.getMethod().length());
+            byte[] bodyType = {packet.getBodyType()};
+            byte[] body = packet.getBody();
+            byte[] bodyLength = ByteUtil.intToByteArrayLE(body.length);
+            list.add(ByteUtil.concatBytes(packetId, statusCode, method, bodyType, bodyLength, body));
+        }
     }
 
     @Override
