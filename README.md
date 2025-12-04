@@ -67,6 +67,14 @@ TalkClient client = new TalkClient(email, password, deviceName, deviceUuid, new 
 });
 ```
 
+## Build
+
+```
+./gradlew jar
+```
+jdk 필요
+jar 파일은 build/libs 디렉터리 안에 생성됩니다.
+
 ## Usage
 
 첫 로그인시에 기기등록이 필요합니다. 콘솔창에 방법 나오니 따라하세요.
