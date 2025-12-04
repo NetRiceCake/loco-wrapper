@@ -20,4 +20,12 @@ public class ChatRoom {
 
     private Map<Long, Member> members = new HashMap<>();
 
+    public int getMemberCount() {
+        return members.size();
+    }
+
+    public Member getMember(long id) {
+        return members.get(id);
+    }
+
 }

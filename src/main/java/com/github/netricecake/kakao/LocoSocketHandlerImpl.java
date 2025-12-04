@@ -5,18 +5,17 @@ import com.github.netricecake.kakao.structs.Member;
 import com.github.netricecake.kakao.structs.Message;
 import com.github.netricecake.loco.LocoPacket;
 import com.github.netricecake.loco.LocoSocektHandler;
-import com.github.netricecake.loco.packet.inbound.member.DelMemIn;
-import com.github.netricecake.loco.packet.inbound.member.MemberIn;
-import com.github.netricecake.loco.packet.inbound.member.NewMemIn;
-import com.github.netricecake.loco.packet.inbound.member.SyncLinkPfIn;
+import com.github.netricecake.loco.packet.inbound.member.*;
 import com.github.netricecake.loco.packet.inbound.message.MessageIn;
 import com.github.netricecake.loco.packet.inbound.room.ChatInfoIn;
 import com.github.netricecake.loco.packet.inbound.room.InfoLinkIn;
 import com.github.netricecake.loco.packet.outbound.member.MemberOut;
 import com.github.netricecake.loco.packet.outbound.room.ChatInfoOut;
+import com.github.netricecake.loco.packet.outbound.member.GetMemberOut;
 import com.github.netricecake.loco.packet.outbound.room.InfoLinkOut;
 import com.github.netricecake.loco.packet.outbound.message.MessageOut;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import lombok.Getter;
 
 public class LocoSocketHandlerImpl extends LocoSocektHandler {
@@ -59,14 +58,14 @@ public class LocoSocketHandlerImpl extends LocoSocektHandler {
 
             ChatRoom room = client.getChatRooms().get(in.getChatId());
             if (!room.getType().equals("OM")) return;
-            client.getTalkHandler().onDelMember(room, new Member(in.getUserId(), in.getNickname()));
+            client.getTalkHandler().onDelMember(room, new Member(in.getUserId(), in.getNickname(), 2));
             room.getMembers().remove(in.getUserId());
         } else if (packet.getMethod().equals("SYNCLINKPF")) {
             SyncLinkPfIn si = new SyncLinkPfIn();
             si.fromBson(packet.getBody());
             ChatRoom room = client.getChatRooms().get(si.getChatId());
             room.getMembers().remove(si.getUserId());
-            Member member = new Member(si.getUserId(), si.getNickName());
+            Member member = new Member(si.getUserId(), si.getNickName(), 2);
             room.getMembers().put(si.getUserId(), member);
         }
     }
@@ -80,6 +79,16 @@ public class LocoSocketHandlerImpl extends LocoSocektHandler {
             room.setChatId(chatId);
             room.setType(ci.getType());
             room.setLinkId(ci.getLinkId());
+            GetMemberOut gmo = new GetMemberOut(chatId);
+            GetMemberIn gmi = new GetMemberIn();
+            gmi.fromBson(client.getSocket().writeAndRead(new LocoPacket("GETMEM", gmo.toBson())).getBody());
+            for (int i = 0; i < gmi.getMembers().size(); i++) {
+                JsonObject json = gmi.getMembers().get(i).getAsJsonObject();
+                int type = json.get("mt") != null ? json.get("mt").getAsInt() : 2;
+                Member member = new Member(json.get("userId").getAsLong(), json.get("nickName").getAsString(), type);
+                room.getMembers().put(member.getId(), member);
+            }
+
             if (ci.getType().equals("OM")) {
                 InfoLinkOut lo =  new InfoLinkOut(ci.getLinkId());
                 InfoLinkIn li = new InfoLinkIn();
@@ -110,7 +119,7 @@ public class LocoSocketHandlerImpl extends LocoSocektHandler {
             MemberOut mo = new MemberOut(chatId, memberId);
             MemberIn mi = new MemberIn();
             mi.fromBson(client.getSocket().writeAndRead(new LocoPacket("MEMBER", mo.toBson())).getBody());
-            room.getMembers().put(memberId, new Member(memberId, mi.getNickName()));
+            room.getMembers().put(memberId, new Member(memberId, mi.getNickName(), mi.getMemberType()));
         }
     }
 

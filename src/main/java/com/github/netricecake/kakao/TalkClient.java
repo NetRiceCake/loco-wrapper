@@ -214,9 +214,13 @@ public class TalkClient {
             return status == 0;
         } catch (Exception e) {
         } finally {
-            //if (postSocket != null) postSocket.close();
+            if (postSocket != null) postSocket.close();
         }
         return false;
+    }
+
+    public long getUserId() {
+        return loginData.userId;
     }
 
 }

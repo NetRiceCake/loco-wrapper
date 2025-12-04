@@ -9,9 +9,12 @@ public class Member {
 
     private String name;
 
-    public Member(long id, String name) {
+    private int memberType;
+
+    public Member(long id, String name, int memberType) {
         this.id = id;
         this.name = name;
+        this.memberType = memberType;
     }
 
 }
