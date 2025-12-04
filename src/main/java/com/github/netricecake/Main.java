@@ -25,7 +25,10 @@ public class Main {
             @Override
             public void onMessage(Message msg) {
                 if (msg.getType() != 1) return; // 1이 그냥 채팅, 그냥 채팅만 받기
-                if (msg.getMessage().equals("!pcheck")) {
+                if (msg.getMessage().equals("!memc")) {
+                    getTalkClient().sendMessage(msg.getChatRoom().getChatId(),  "멤버수 : " + msg.getChatRoom().getMemberCount());
+                }
+                else if (msg.getMessage().equals("!pcheck")) {
                     int type = msg.getChatRoom().getMember(getTalkClient().getUserId()).getMemberType();
                     getTalkClient().sendMessage(msg.getChatRoom().getChatId(),  "현재 봇계정의 멤버 타입 : " + type);
                     getTalkClient().sendMessage(msg.getChatRoom().getChatId(),  "현재 님계정의 멤버 타입 : " + msg.getAuthor().getMemberType());
