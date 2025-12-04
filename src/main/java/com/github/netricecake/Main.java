@@ -17,7 +17,7 @@ public class Main {
 
     static String email = "invalid@example.com"; // 이메일 말고 전화번호도 가능
     static String password = "example";
-    static String deviceName = "SM-X930"; // 갤럭시 탭 s11 울트라,   지원되는 태블릿 모델명 넣으세요
+    static String deviceName = "SM-X930"; // 갤럭시 탭 s11 울트라, 그대로 써도 되고 바꿀거면 서브 디바이스 로그인 지원되는 태블릿 모델명 넣으세요
     static String deviceUuid = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // 64자 랜덤 hex-string, 이것도 에시니까 무조건 다른걸로 바꾸세요.
 
     public static void main(String[] args) throws Exception {
