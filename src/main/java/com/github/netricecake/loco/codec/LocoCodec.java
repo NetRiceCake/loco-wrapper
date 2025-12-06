@@ -1,24 +1,33 @@
 package com.github.netricecake.loco.codec;
 
 import com.github.netricecake.loco.LocoPacket;
-import com.github.netricecake.loco.LocoSocket;
+import com.github.netricecake.loco.LocoSocketHandler;
 import com.github.netricecake.loco.util.BsonUtil;
 import com.github.netricecake.loco.util.ByteUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageCodec;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 public class LocoCodec extends MessageToMessageCodec<byte[], LocoPacket> {
 
     private LocoPacket currentLocoPacket = null;
     private byte[] buffer = new byte[0];
 
-    private final LocoSocket locoSocket;
+    private final Map<Integer, Future<LocoPacket>> waitList;
 
-    public LocoCodec(LocoSocket locoSocekt) {
-        this.locoSocket = locoSocekt;
+    private final LocoSocketHandler locoSocektHandler;
+
+    private final ExecutorService handlerPool;
+
+    public LocoCodec(LocoSocketHandler locoSocektHandler, ExecutorService handlerPool, Map<Integer, Future<LocoPacket>> waitList) {
+        this.locoSocektHandler = locoSocektHandler;
+        this.handlerPool = handlerPool;
+        this.waitList = waitList;
     }
 
     @Override
@@ -59,17 +68,16 @@ public class LocoCodec extends MessageToMessageCodec<byte[], LocoPacket> {
             }
             if (currentLocoPacket.getBodyLength() > buffer.length) break;
             byte[] body = ByteUtil.sliceBytes(buffer, 0, currentLocoPacket.getBodyLength());
-            System.out.println(currentLocoPacket.getMethod());
-            System.out.println(BsonUtil.bsonToJson(body));
+            //System.out.println(currentLocoPacket.getMethod());
+            //System.out.println(BsonUtil.bsonToJson(body));
             buffer = ByteUtil.sliceBytes(buffer, currentLocoPacket.getBodyLength(), buffer.length - currentLocoPacket.getBodyLength());
             currentLocoPacket.setBody(body);
-            if (locoSocket.getWaitList().containsKey(currentLocoPacket.getPacketId())) {
-                ((CompletableFuture<LocoPacket>) locoSocket.getWaitList().get(currentLocoPacket.getPacketId())).complete(currentLocoPacket);
-                locoSocket.getWaitList().remove(currentLocoPacket.getPacketId());
+            if (waitList.containsKey(currentLocoPacket.getPacketId())) {
+                ((CompletableFuture<LocoPacket>) waitList.get(currentLocoPacket.getPacketId())).complete(currentLocoPacket);
             } else {
                 final LocoPacket p = currentLocoPacket;
-                locoSocket.getHandlerPool().execute(() -> {
-                    locoSocket.getLocoSocektHandler().onPacket(p);
+                handlerPool.execute(() -> {
+                    locoSocektHandler.onPacket(p);
                 });
             }
             currentLocoPacket = null;

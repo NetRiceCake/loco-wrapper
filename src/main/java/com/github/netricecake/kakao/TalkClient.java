@@ -3,7 +3,7 @@ package com.github.netricecake.kakao;
 import com.github.netricecake.kakao.exception.*;
 import com.github.netricecake.kakao.structs.ChatRoom;
 import com.github.netricecake.loco.LocoPacket;
-import com.github.netricecake.loco.LocoSocektHandler;
+import com.github.netricecake.loco.LocoSocketHandler;
 import com.github.netricecake.loco.LocoSocket;
 import com.github.netricecake.loco.packet.inbound.login.CheckInIn;
 import com.github.netricecake.loco.packet.inbound.login.GetConfIn;
@@ -90,7 +90,7 @@ public class TalkClient {
         bookingData = KakaoApi.getBookingData(loginData.userId);
         if (bookingData == null || bookingData.getStatus() != 0) throw new BookingFailedException();
 
-        LocoSocket checkInSocket = new LocoSocket(bookingData.getAddr(), bookingData.getPort(), new LocoSocektHandler() {
+        LocoSocket checkInSocket = new LocoSocket(bookingData.getAddr(), bookingData.getPort(), new LocoSocketHandler() {
             @Override
             public void onError(Exception e) {
                 e.printStackTrace();
@@ -181,7 +181,7 @@ public class TalkClient {
             if (si.getStatus() != 0) return false;
 
             final CompletableFuture<Integer> future = new CompletableFuture<>();
-            postSocket = new LocoSocket(si.getVhost(), si.getPort(), new LocoSocektHandler() {
+            postSocket = new LocoSocket(si.getVhost(), si.getPort(), new LocoSocketHandler() {
                 @Override
                 public void onPacket(LocoPacket packet) {
                     JsonObject jsonObject = BsonUtil.bsonToJsonObject(packet.getBody());

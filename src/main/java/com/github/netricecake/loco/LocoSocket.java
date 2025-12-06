@@ -21,11 +21,12 @@ import java.util.concurrent.*;
 public class LocoSocket {
 
     @Getter
-    private String ip;
+    private final String ip;
     @Getter
-    private int port;
+    private final int port;
 
-    private CryptoManager cryptoManager;
+    @Getter
+    private final CryptoManager cryptoManager = new CryptoManager();;
 
     private Channel channel;
     private EventLoopGroup eventLoopGroup;
@@ -33,28 +34,24 @@ public class LocoSocket {
     @Getter
     private boolean alive = false;
 
-    @Getter
-    private Map<Integer, Future<LocoPacket>> waitList = new HashMap<>();
+    private final LocoSocketHandler locoSocektHandler;
 
-    @Getter
-    private LocoSocektHandler locoSocektHandler;
+    private final ExecutorService handlerPool;
 
-    @Getter
-    private ExecutorService handlerPool;
+    private final Map<Integer, Future<LocoPacket>> waitList = new HashMap<>();
 
     private int packetIdCounter = 1000;
 
-    public LocoSocket(String ip, int port, LocoSocektHandler locoSocektHandler, ExecutorService handlerPool) {
+    public LocoSocket(String ip, int port, LocoSocketHandler locoSocektHandler, ExecutorService handlerPool) {
         this.ip = ip;
         this.port = port;
         this.locoSocektHandler = locoSocektHandler;
         this.handlerPool = handlerPool;
-        cryptoManager = new CryptoManager();
     }
 
     public void connect() throws IOException {
+        if (alive) throw new IOException("Already connected");
         try {
-            byte[] handshakePacket = cryptoManager.generateHandshakeMessage();
             eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
             Bootstrap bootstrap = new Bootstrap();
             bootstrap.remoteAddress(new InetSocketAddress(ip, port))
@@ -70,21 +67,17 @@ public class LocoSocket {
                     });
             channel = bootstrap.connect().sync().channel();
             alive = true;
-            channel.writeAndFlush(handshakePacket).sync();
+            channel.writeAndFlush(cryptoManager.generateHandshakeMessage()).sync();
             channel.pipeline().addLast(new SecureLayerCodec(cryptoManager));
-            channel.pipeline().addLast(new LocoCodec(this));
-            handlerPool.execute(() -> {
-                locoSocektHandler.onConnect();
-            });
+            channel.pipeline().addLast(new LocoCodec(locoSocektHandler, handlerPool, waitList));
+            handlerPool.execute(locoSocektHandler::onConnect);
             new Thread() {
                 @Override
                 public void run() {
                     try {
                         channel.closeFuture().sync();
                         eventLoopGroup.shutdownGracefully();
-                        handlerPool.execute(() -> {
-                            locoSocektHandler.onDisconnect();
-                        });
+                        handlerPool.execute(locoSocektHandler::onDisconnect);
                         alive = false;
                     } catch (Exception e) {
                         handlerPool.execute(() -> {
@@ -119,7 +112,9 @@ public class LocoSocket {
         waitList.put(packetId, future);
         channel.writeAndFlush(packet);
         try {
-            return future.get();
+            LocoPacket result = future.get(5, TimeUnit.SECONDS);
+            waitList.remove(packetId);
+            return result;
         } catch (Exception e) {
             handlerPool.execute(() -> {
                 locoSocektHandler.onError(e);
@@ -135,6 +130,7 @@ public class LocoSocket {
         });
         eventLoopGroup.shutdownGracefully();
         channel.close();
+        handlerPool.execute(locoSocektHandler::onDisconnect);
         alive = false;
     }
 

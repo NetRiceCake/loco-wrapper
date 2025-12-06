@@ -4,7 +4,7 @@ import com.github.netricecake.kakao.structs.ChatRoom;
 import com.github.netricecake.kakao.structs.Member;
 import com.github.netricecake.kakao.structs.Message;
 import com.github.netricecake.loco.LocoPacket;
-import com.github.netricecake.loco.LocoSocektHandler;
+import com.github.netricecake.loco.LocoSocketHandler;
 import com.github.netricecake.loco.packet.inbound.member.*;
 import com.github.netricecake.loco.packet.inbound.message.MessageIn;
 import com.github.netricecake.loco.packet.inbound.room.ChatInfoIn;
@@ -18,7 +18,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import lombok.Getter;
 
-public class LocoSocketHandlerImpl extends LocoSocektHandler {
+public class LocoSocketHandlerImpl extends LocoSocketHandler {
 
     @Getter
     private TalkClient client;
