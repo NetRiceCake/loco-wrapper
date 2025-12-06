@@ -56,7 +56,7 @@ public class KakaoApi {
         if (!checkAllowedDevice(deviceName)) throw new InvalidDeviceNameException();
         RequestBody body = new FormBody.Builder().add("password", password)
                 .add("device_name", deviceName)
-                .add("foced", "false")
+                .add("forced", "false")
                 .add("permanent", "true")
                 .add("email", email)
                 .add("device_uuid", deviceUuid).build();
