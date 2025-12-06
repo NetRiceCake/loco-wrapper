@@ -6,6 +6,8 @@
 
 <U>**device uuid 무조건 바꾸시오.**</U>
 
+자바21에 추가된 virtual thread 사용하도록 바꾸는중...
+
 ## Example
 
 ![ex](./ex.png)
@@ -72,7 +74,8 @@ TalkClient client = new TalkClient(email, password, deviceName, deviceUuid, new 
 ```
 ./gradlew jar
 ```
-jdk 필요
+jdk21 이상 필요
+
 jar 파일은 build/libs 디렉터리 안에 생성됩니다.
 
 ## Usage

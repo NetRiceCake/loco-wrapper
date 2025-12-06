@@ -21,6 +21,10 @@ public class Main {
     static String deviceUuid = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // 64자 랜덤 hex-string, 이것도 에시니까 무조건 다른걸로 바꾸세요.
 
     public static void main(String[] args) throws Exception {
+
+        System.setProperty("jdk.virtualThreadScheduler.parallelism", "1");
+        System.setProperty("jdk.virtualThreadScheduler.maxPoolSize", "1");
+
         TalkClient client = new TalkClient(email, password, deviceName, deviceUuid, new TalkHandler() {
             @Override
             public void onMessage(Message msg) {

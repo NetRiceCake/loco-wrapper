@@ -32,8 +32,6 @@ import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class TalkClient {
 
@@ -53,8 +51,6 @@ public class TalkClient {
     private GetConfIn bookingData;
     private CheckInIn checkInData;
     private LoginListIn loginListData;
-
-    private ExecutorService locoHandlerPool;
 
     @Getter
     private TalkHandler talkHandler;
@@ -95,7 +91,7 @@ public class TalkClient {
             public void onError(Exception e) {
                 e.printStackTrace();
             }
-        }, Executors.newFixedThreadPool(1));
+        });
         byte[] body = new CheckInOut(loginData.userId).toBson();
         checkInSocket.connect();
         LocoPacket checkinResponse = checkInSocket.writeAndRead(new LocoPacket(1000, "CHECKIN", body));
@@ -115,9 +111,7 @@ public class TalkClient {
             rp = ByteUtil.hexStringToByteArray("0100ffff0100"); // 이게 도대체 뭐임
         }
 
-        locoHandlerPool = Executors.newFixedThreadPool(1);
-
-        socket = new LocoSocket(checkInData.getHost(), checkInData.getPort(), new LocoSocketHandlerImpl(this), locoHandlerPool);
+        socket = new LocoSocket(checkInData.getHost(), checkInData.getPort(), new LocoSocketHandlerImpl(this));
         socket.connect();
         LoginListOut req = new LoginListOut();
         req.setDuuid(deviceUuid);
@@ -139,7 +133,7 @@ public class TalkClient {
 
         connected = true;
 
-        new Thread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 while (socket.isAlive()) {
                     Thread.sleep(5 * 60 * 1000);
@@ -150,7 +144,7 @@ public class TalkClient {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }).start();
+        });
     }
 
     public boolean sendMessage(long chatId, int type, String message, String extra) {
@@ -188,7 +182,7 @@ public class TalkClient {
                     int status = jsonObject.get("status").getAsInt();
                     future.complete(status);
                 }
-            }, Executors.newFixedThreadPool(1));
+            });
             postSocket.connect();
 
             PostOut po =  new PostOut();
