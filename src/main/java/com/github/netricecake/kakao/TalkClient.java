@@ -36,14 +36,14 @@ import java.util.concurrent.Executors;
 
 public class TalkClient {
 
-    private String email;
-    private String password;
-    private String deviceName;
-    private String deviceUuid;
-    private String sessionDir;
+    private final String email;
+    private final String password;
+    private final String deviceName;
+    private final String deviceUuid;
+    private final String sessionDir;
 
     @Getter
-    private Map<Long, ChatRoom> chatRooms = new HashMap<>();
+    private final Map<Long, ChatRoom> chatRooms = new HashMap<>();
 
     @Getter
     protected boolean connected;

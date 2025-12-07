@@ -55,10 +55,9 @@ public class CryptoManager {
             byte[] length = ByteUtil.intToByteArrayLE(HANDSHAKE_BODY_SIZE);
             return ByteUtil.concatBytes(length, ByteUtil.intToByteArrayLE(RSA_LOCO_HEADER), ByteUtil.intToByteArrayLE(AES_LOCO_HEADER), encryptedKey);
         } catch (Exception e) {}
-        return new byte[0];
+        return null;
     }
 
-    // 바디 사이즈가 131067가 최대인거 같은데 잘 모르겠음
     public byte[] encryptMessage(byte[] message) {
         try {
             byte[] nonce = new byte[AES_NONCE_SIZE];
@@ -67,7 +66,7 @@ public class CryptoManager {
             cipher.init(Cipher.ENCRYPT_MODE, aesKey, new GCMParameterSpec(AES_KEY_SIZE, nonce));
             return ByteUtil.concatBytes(nonce, cipher.doFinal(message));
         } catch (Exception e) {}
-        return new byte[0];
+        return null;
     }
 
     public byte[] decryptMessage(byte[] message) {
@@ -77,7 +76,7 @@ public class CryptoManager {
             cipher.init(Cipher.DECRYPT_MODE, aesKey,  new GCMParameterSpec(AES_KEY_SIZE, nonce));
             return cipher.doFinal(ByteUtil.sliceBytes(message, AES_NONCE_SIZE, message.length - nonce.length));
         } catch (Exception e) {}
-        return new byte[0];
+        return null;
     }
 
 }

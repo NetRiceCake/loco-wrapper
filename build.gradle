@@ -4,6 +4,8 @@ plugins {
 
 group = 'com.github.netricecake'
 version = '1.0-SNAPSHOT'
+sourceCompatibility = '21'
+targetCompatibility = '21'
 
 jar {
     manifest {
