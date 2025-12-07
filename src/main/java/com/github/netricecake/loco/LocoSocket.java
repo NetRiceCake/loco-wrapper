@@ -36,14 +36,17 @@ public class LocoSocket {
 
     private final LocoSocketHandler locoSocketHandler;
 
+    private final ExecutorService handlerLoop;
+
     private final Map<Integer, Future<LocoPacket>> waitList = new HashMap<>();
 
     private int packetIdCounter = 1000;
 
-    public LocoSocket(String ip, int port, LocoSocketHandler locoSocketHandler) {
+    public LocoSocket(String ip, int port, LocoSocketHandler locoSocketHandler, ExecutorService handlerLoop) {
         this.ip = ip;
         this.port = port;
         this.locoSocketHandler = locoSocketHandler;
+        this.handlerLoop = handlerLoop;
     }
 
     public void connect() throws IOException {
@@ -66,10 +69,10 @@ public class LocoSocket {
             alive = true;
             channel.writeAndFlush(cryptoManager.generateHandshakeMessage()).sync();
             channel.pipeline().addLast(new SecureLayerCodec(cryptoManager));
-            channel.pipeline().addLast(new LocoCodec(locoSocketHandler, waitList));
-            Thread.ofVirtual().start(locoSocketHandler::onConnect);
+            channel.pipeline().addLast(new LocoCodec(locoSocketHandler, waitList, handlerLoop));
+            handlerLoop.execute(locoSocketHandler::onConnect);
 
-            final CompletableFuture<?> closeFuture = new CompletableFuture<>(); // 네티 퓨처 sync함수가 virtual thread에서 제대로 작동하지 않습니다.(쓰레드 양보를 안함) 그래서 이렇게 해야됨
+            final CompletableFuture<?> closeFuture = new CompletableFuture<>(); // 네티 퓨처 sync함수가 virtual thread에서 제대로 작동하지 않습니다.(쓰레드 양보를 안함)
             channel.closeFuture().addListener(future -> {
                 closeFuture.complete(null);
             });
@@ -77,7 +80,7 @@ public class LocoSocket {
                 try {
                     closeFuture.get();
                     eventLoopGroup.shutdownGracefully();
-                    locoSocketHandler.onDisconnect();
+                    handlerLoop.execute(locoSocketHandler::onDisconnect);
                     alive = false;
                 } catch (Exception e) {
                     locoSocketHandler.onError(e);
@@ -85,7 +88,7 @@ public class LocoSocket {
             });
 
         } catch (InterruptedException e) {
-            Thread.ofVirtual().start(() -> {
+            handlerLoop.execute(() -> {
                 locoSocketHandler.onError(e);
             });
         }
@@ -114,7 +117,9 @@ public class LocoSocket {
             waitList.remove(packetId);
             return result;
         } catch (Exception e) {
-            locoSocketHandler.onError(e);
+            handlerLoop.execute(() -> {
+                locoSocketHandler.onError(e);
+            });
         }
         return null;
     }
@@ -123,7 +128,7 @@ public class LocoSocket {
         if (!alive) return;
         eventLoopGroup.shutdownGracefully();
         channel.close();
-        Thread.ofVirtual().start(locoSocketHandler::onDisconnect);
+        handlerLoop.execute(locoSocketHandler::onDisconnect);
         alive = false;
     }
 

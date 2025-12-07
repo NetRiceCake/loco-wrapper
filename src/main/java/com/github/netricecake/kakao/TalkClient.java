@@ -32,6 +32,7 @@ import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 
 public class TalkClient {
 
@@ -91,7 +92,7 @@ public class TalkClient {
             public void onError(Exception e) {
                 e.printStackTrace();
             }
-        });
+        }, Executors.newFixedThreadPool(1));
         byte[] body = new CheckInOut(loginData.userId).toBson();
         checkInSocket.connect();
         LocoPacket checkinResponse = checkInSocket.writeAndRead(new LocoPacket(1000, "CHECKIN", body));
@@ -111,7 +112,7 @@ public class TalkClient {
             rp = ByteUtil.hexStringToByteArray("0100ffff0100"); // 이게 도대체 뭐임
         }
 
-        socket = new LocoSocket(checkInData.getHost(), checkInData.getPort(), new LocoSocketHandlerImpl(this));
+        socket = new LocoSocket(checkInData.getHost(), checkInData.getPort(), new LocoSocketHandlerImpl(this), Executors.newFixedThreadPool(1));
         socket.connect();
         LoginListOut req = new LoginListOut();
         req.setDuuid(deviceUuid);
@@ -182,7 +183,7 @@ public class TalkClient {
                     int status = jsonObject.get("status").getAsInt();
                     future.complete(status);
                 }
-            });
+            }, Executors.newFixedThreadPool(1));
             postSocket.connect();
 
             PostOut po =  new PostOut();

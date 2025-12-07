@@ -10,6 +10,7 @@ import io.netty.handler.codec.MessageToMessageCodec;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 public class LocoCodec extends MessageToMessageCodec<byte[], LocoPacket> {
@@ -21,9 +22,12 @@ public class LocoCodec extends MessageToMessageCodec<byte[], LocoPacket> {
 
     private final LocoSocketHandler locoSocketHandler;
 
-    public LocoCodec(LocoSocketHandler locoSocketHandler, Map<Integer, Future<LocoPacket>> waitList) {
+    private final ExecutorService handlerLoop;
+
+    public LocoCodec(LocoSocketHandler locoSocketHandler, Map<Integer, Future<LocoPacket>> waitList, ExecutorService handlerLoop) {
         this.locoSocketHandler = locoSocketHandler;
         this.waitList = waitList;
+        this.handlerLoop = handlerLoop;
     }
 
     @Override
@@ -72,7 +76,7 @@ public class LocoCodec extends MessageToMessageCodec<byte[], LocoPacket> {
                 ((CompletableFuture<LocoPacket>) waitList.get(currentLocoPacket.getPacketId())).complete(currentLocoPacket);
             } else {
                 final LocoPacket p = currentLocoPacket;
-                Thread.ofVirtual().start(() -> {
+                handlerLoop.execute(() -> {
                     locoSocketHandler.onPacket(p);
                 });
             }
