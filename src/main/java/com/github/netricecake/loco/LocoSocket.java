@@ -34,19 +34,19 @@ public class LocoSocket {
     @Getter
     private boolean alive = false;
 
-    private final LocoSocketHandler locoSocektHandler;
+    private final LocoSocketHandler locoSocketHandler;
 
-    private final ExecutorService handlerPool;
+    private final ExecutorService handlerLoop;
 
     private final Map<Integer, Future<LocoPacket>> waitList = new HashMap<>();
 
     private int packetIdCounter = 1000;
 
-    public LocoSocket(String ip, int port, LocoSocketHandler locoSocektHandler, ExecutorService handlerPool) {
+    public LocoSocket(String ip, int port, LocoSocketHandler locoSocketHandler, ExecutorService handlerLoop) {
         this.ip = ip;
         this.port = port;
-        this.locoSocektHandler = locoSocektHandler;
-        this.handlerPool = handlerPool;
+        this.locoSocketHandler = locoSocketHandler;
+        this.handlerLoop = handlerLoop;
     }
 
     public void connect() throws IOException {
@@ -69,26 +69,27 @@ public class LocoSocket {
             alive = true;
             channel.writeAndFlush(cryptoManager.generateHandshakeMessage()).sync();
             channel.pipeline().addLast(new SecureLayerCodec(cryptoManager));
-            channel.pipeline().addLast(new LocoCodec(locoSocektHandler, handlerPool, waitList));
-            handlerPool.execute(locoSocektHandler::onConnect);
-            new Thread() {
-                @Override
-                public void run() {
-                    try {
-                        channel.closeFuture().sync();
-                        eventLoopGroup.shutdownGracefully();
-                        handlerPool.execute(locoSocektHandler::onDisconnect);
-                        alive = false;
-                    } catch (Exception e) {
-                        handlerPool.execute(() -> {
-                            locoSocektHandler.onError(e);
-                        });
-                    }
+            channel.pipeline().addLast(new LocoCodec(locoSocketHandler, waitList, handlerLoop));
+            handlerLoop.execute(locoSocketHandler::onConnect);
+
+            final CompletableFuture<?> closeFuture = new CompletableFuture<>(); // 네티 퓨처 sync함수가 virtual thread에서 제대로 작동하지 않습니다.(쓰레드 양보를 안함)
+            channel.closeFuture().addListener(future -> {
+                closeFuture.complete(null);
+            });
+            Thread.ofVirtual().start(() -> {
+                try {
+                    closeFuture.get();
+                    eventLoopGroup.shutdownGracefully();
+                    handlerLoop.execute(locoSocketHandler::onDisconnect);
+                    alive = false;
+                } catch (Exception e) {
+                    locoSocketHandler.onError(e);
                 }
-            }.start();
+            });
+
         } catch (InterruptedException e) {
-            handlerPool.execute(() -> {
-                locoSocektHandler.onError(e);
+            handlerLoop.execute(() -> {
+                locoSocketHandler.onError(e);
             });
         }
     }
@@ -116,8 +117,8 @@ public class LocoSocket {
             waitList.remove(packetId);
             return result;
         } catch (Exception e) {
-            handlerPool.execute(() -> {
-                locoSocektHandler.onError(e);
+            handlerLoop.execute(() -> {
+                locoSocketHandler.onError(e);
             });
         }
         return null;
@@ -125,12 +126,9 @@ public class LocoSocket {
 
     public void close() {
         if (!alive) return;
-        handlerPool.execute(() -> {
-            locoSocektHandler.onDisconnect();
-        });
         eventLoopGroup.shutdownGracefully();
         channel.close();
-        handlerPool.execute(locoSocektHandler::onDisconnect);
+        handlerLoop.execute(locoSocketHandler::onDisconnect);
         alive = false;
     }
 

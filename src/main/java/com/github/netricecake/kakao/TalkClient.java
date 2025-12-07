@@ -32,19 +32,18 @@ import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class TalkClient {
 
-    private String email;
-    private String password;
-    private String deviceName;
-    private String deviceUuid;
-    private String sessionDir;
+    private final String email;
+    private final String password;
+    private final String deviceName;
+    private final String deviceUuid;
+    private final String sessionDir;
 
     @Getter
-    private Map<Long, ChatRoom> chatRooms = new HashMap<>();
+    private final Map<Long, ChatRoom> chatRooms = new HashMap<>();
 
     @Getter
     protected boolean connected;
@@ -53,8 +52,6 @@ public class TalkClient {
     private GetConfIn bookingData;
     private CheckInIn checkInData;
     private LoginListIn loginListData;
-
-    private ExecutorService locoHandlerPool;
 
     @Getter
     private TalkHandler talkHandler;
@@ -115,9 +112,7 @@ public class TalkClient {
             rp = ByteUtil.hexStringToByteArray("0100ffff0100"); // 이게 도대체 뭐임
         }
 
-        locoHandlerPool = Executors.newFixedThreadPool(1);
-
-        socket = new LocoSocket(checkInData.getHost(), checkInData.getPort(), new LocoSocketHandlerImpl(this), locoHandlerPool);
+        socket = new LocoSocket(checkInData.getHost(), checkInData.getPort(), new LocoSocketHandlerImpl(this), Executors.newFixedThreadPool(1));
         socket.connect();
         LoginListOut req = new LoginListOut();
         req.setDuuid(deviceUuid);
@@ -139,7 +134,7 @@ public class TalkClient {
 
         connected = true;
 
-        new Thread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 while (socket.isAlive()) {
                     Thread.sleep(5 * 60 * 1000);
@@ -150,7 +145,7 @@ public class TalkClient {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }).start();
+        });
     }
 
     public boolean sendMessage(long chatId, int type, String message, String extra) {

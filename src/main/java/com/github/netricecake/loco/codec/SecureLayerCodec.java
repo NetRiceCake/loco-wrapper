@@ -9,7 +9,7 @@ import java.util.List;
 
 public class SecureLayerCodec extends MessageToMessageCodec<byte[], byte[]> {
 
-    private CryptoManager cryptoManager;
+    private final CryptoManager cryptoManager;
 
     private int currentLength = -1;
     private byte[] buffer = new byte[0];
@@ -20,6 +20,7 @@ public class SecureLayerCodec extends MessageToMessageCodec<byte[], byte[]> {
 
     @Override
     protected void encode(ChannelHandlerContext channelHandlerContext, byte[] bytes, List<Object> list) throws Exception {
+        // TODO 길이 길면 짤라서 암호화해서 보내야됨
         byte[] encryptedBody = cryptoManager.encryptMessage(bytes);
         byte[] packet = ByteUtil.concatBytes(ByteUtil.intToByteArrayLE(encryptedBody.length), encryptedBody);
         list.add(packet);

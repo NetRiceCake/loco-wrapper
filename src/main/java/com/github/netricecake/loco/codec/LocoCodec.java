@@ -20,14 +20,14 @@ public class LocoCodec extends MessageToMessageCodec<byte[], LocoPacket> {
 
     private final Map<Integer, Future<LocoPacket>> waitList;
 
-    private final LocoSocketHandler locoSocektHandler;
+    private final LocoSocketHandler locoSocketHandler;
 
-    private final ExecutorService handlerPool;
+    private final ExecutorService handlerLoop;
 
-    public LocoCodec(LocoSocketHandler locoSocektHandler, ExecutorService handlerPool, Map<Integer, Future<LocoPacket>> waitList) {
-        this.locoSocektHandler = locoSocektHandler;
-        this.handlerPool = handlerPool;
+    public LocoCodec(LocoSocketHandler locoSocketHandler, Map<Integer, Future<LocoPacket>> waitList, ExecutorService handlerLoop) {
+        this.locoSocketHandler = locoSocketHandler;
         this.waitList = waitList;
+        this.handlerLoop = handlerLoop;
     }
 
     @Override
@@ -68,16 +68,16 @@ public class LocoCodec extends MessageToMessageCodec<byte[], LocoPacket> {
             }
             if (currentLocoPacket.getBodyLength() > buffer.length) break;
             byte[] body = ByteUtil.sliceBytes(buffer, 0, currentLocoPacket.getBodyLength());
-            //System.out.println(currentLocoPacket.getMethod());
-            //System.out.println(BsonUtil.bsonToJson(body));
+            System.out.println(currentLocoPacket.getMethod());
+            System.out.println(BsonUtil.bsonToJson(body));
             buffer = ByteUtil.sliceBytes(buffer, currentLocoPacket.getBodyLength(), buffer.length - currentLocoPacket.getBodyLength());
             currentLocoPacket.setBody(body);
             if (waitList.containsKey(currentLocoPacket.getPacketId())) {
                 ((CompletableFuture<LocoPacket>) waitList.get(currentLocoPacket.getPacketId())).complete(currentLocoPacket);
             } else {
                 final LocoPacket p = currentLocoPacket;
-                handlerPool.execute(() -> {
-                    locoSocektHandler.onPacket(p);
+                handlerLoop.execute(() -> {
+                    locoSocketHandler.onPacket(p);
                 });
             }
             currentLocoPacket = null;

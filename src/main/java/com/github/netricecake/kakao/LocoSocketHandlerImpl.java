@@ -16,12 +16,10 @@ import com.github.netricecake.loco.packet.outbound.room.InfoLinkOut;
 import com.github.netricecake.loco.packet.outbound.message.MessageOut;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import lombok.Getter;
 
 public class LocoSocketHandlerImpl extends LocoSocketHandler {
 
-    @Getter
-    private TalkClient client;
+    private final TalkClient client;
 
     public LocoSocketHandlerImpl(TalkClient client) {
         this.client = client;
@@ -41,7 +39,9 @@ public class LocoSocketHandlerImpl extends LocoSocketHandler {
             Member member = room.getMembers().get(in.getAuthorId());
 
             Message msg = new Message(in.getLogId(), room, member, in.getType(), in.getMessage(), in.getAttachment());
-            client.getTalkHandler().onMessage(msg);
+            Thread.ofVirtual().start(() -> {
+                client.getTalkHandler().onMessage(msg);
+            });
         } else if (packet.getMethod().equals("NEWMEM")) {
             NewMemIn in = new NewMemIn();
             in.fromBson(packet.getBody());
@@ -50,7 +50,9 @@ public class LocoSocketHandlerImpl extends LocoSocketHandler {
 
             ChatRoom room = client.getChatRooms().get(in.getChatId());
             if (!room.getType().equals("OM")) return;
-            client.getTalkHandler().onNewMember(room, room.getMembers().get(in.getUserId()));
+            Thread.ofVirtual().start(() -> {
+                client.getTalkHandler().onNewMember(room, room.getMembers().get(in.getUserId()));
+            });
         } else if (packet.getMethod().equals("DELMEM")) {
             DelMemIn in = new DelMemIn();
             in.fromBson(packet.getBody());
@@ -58,7 +60,9 @@ public class LocoSocketHandlerImpl extends LocoSocketHandler {
 
             ChatRoom room = client.getChatRooms().get(in.getChatId());
             if (!room.getType().equals("OM")) return;
-            client.getTalkHandler().onDelMember(room, new Member(in.getUserId(), in.getNickname(), 2));
+            Thread.ofVirtual().start(() -> {
+                client.getTalkHandler().onDelMember(room, new Member(in.getUserId(), in.getNickname(), 2));
+            });
             room.getMembers().remove(in.getUserId());
         } else if (packet.getMethod().equals("SYNCLINKPF")) {
             SyncLinkPfIn si = new SyncLinkPfIn();
