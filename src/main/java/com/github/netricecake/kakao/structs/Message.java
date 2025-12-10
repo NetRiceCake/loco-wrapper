@@ -1,29 +1,48 @@
 package com.github.netricecake.kakao.structs;
 
+import com.github.netricecake.kakao.TalkClient;
+import com.github.netricecake.kakao.loco.LocoPacket;
+import com.github.netricecake.kakao.packet.inbound.message.WriteIn;
+import com.github.netricecake.kakao.packet.outbound.message.WriteOut;
+import com.google.gson.JsonObject;
 import lombok.Getter;
 
 @Getter
 public class Message {
 
-    private long logId;
+    private final TalkClient client;
 
-    private ChatRoom chatRoom;
+    private final ChatRoom chatRoom;
 
-    private Member author;
+    private final long logId;
 
-    private int type;
+    private final Member author;
 
-    private String message;
+    private final int type;
 
-    private String attachment;
+    private final long sendTime;
 
-    public Message(long logId, ChatRoom chatRoom, Member author, int type, String message, String attachment) {
+    private final String message;
+
+    private final String attachment;
+
+    public Message(TalkClient client, ChatRoom chatRoom, long logId, Member author, int type, long sendTime, String message, String attachment) {
+        this.client = client;
         this.logId = logId;
         this.chatRoom = chatRoom;
         this.author = author;
         this.type = type;
+        this.sendTime = sendTime;
         this.message = message;
         this.attachment = attachment;
+    }
+
+    public boolean reply(String message) {
+        return client.reply(this, message);
+    }
+
+    public boolean blind() {
+        return false;
     }
 
 }

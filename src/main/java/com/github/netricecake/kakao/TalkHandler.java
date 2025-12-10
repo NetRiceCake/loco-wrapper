@@ -12,6 +12,14 @@ public class TalkHandler {
     @Setter
     private TalkClient talkClient;
 
+    public void onConnect() {
+
+    }
+
+    public void onDisconnect() {
+
+    }
+
     public void onMessage(Message message) {
 
     }
@@ -20,7 +28,7 @@ public class TalkHandler {
 
     }
 
-    public void onDelMember(ChatRoom chatRoom, Member member) {
+    public void onDelMember(ChatRoom chatRoom, long userId, String nickName) {
 
     }
 

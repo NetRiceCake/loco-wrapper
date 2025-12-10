@@ -1,25 +1,34 @@
 package com.github.netricecake.kakao;
 
 import com.github.netricecake.kakao.exception.*;
-import com.github.netricecake.kakao.structs.ChatRoom;
-import com.github.netricecake.loco.LocoPacket;
-import com.github.netricecake.loco.LocoSocketHandler;
-import com.github.netricecake.loco.LocoSocket;
-import com.github.netricecake.loco.packet.inbound.login.CheckInIn;
-import com.github.netricecake.loco.packet.inbound.login.GetConfIn;
-import com.github.netricecake.loco.packet.inbound.login.LoginListIn;
-import com.github.netricecake.loco.packet.inbound.message.PostIn;
-import com.github.netricecake.loco.packet.inbound.message.ShipIn;
-import com.github.netricecake.loco.packet.inbound.message.WriteIn;
-import com.github.netricecake.loco.packet.outbound.login.CheckInOut;
-import com.github.netricecake.loco.packet.outbound.login.LoginListOut;
-import com.github.netricecake.loco.packet.outbound.etc.PingOut;
-import com.github.netricecake.loco.packet.outbound.message.PostOut;
-import com.github.netricecake.loco.packet.outbound.message.ShipOut;
-import com.github.netricecake.loco.packet.outbound.message.WriteOut;
-import com.github.netricecake.loco.util.BsonUtil;
-import com.github.netricecake.loco.util.ByteUtil;
+import com.github.netricecake.kakao.packet.inbound.member.GetMemberIn;
+import com.github.netricecake.kakao.packet.inbound.message.PostIn;
+import com.github.netricecake.kakao.packet.inbound.message.ShipIn;
+import com.github.netricecake.kakao.packet.inbound.room.ChatInfoIn;
+import com.github.netricecake.kakao.packet.inbound.room.InfoLinkIn;
+import com.github.netricecake.kakao.packet.outbound.member.GetMemberOut;
+import com.github.netricecake.kakao.packet.outbound.message.PostOut;
+import com.github.netricecake.kakao.packet.outbound.message.ShipOut;
+import com.github.netricecake.kakao.packet.outbound.room.ChatInfoOut;
+import com.github.netricecake.kakao.packet.outbound.room.InfoLinkOut;
+import com.github.netricecake.kakao.structs.*;
+import com.github.netricecake.kakao.loco.LocoPacket;
+import com.github.netricecake.kakao.loco.LocoSocketHandler;
+import com.github.netricecake.kakao.loco.LocoSocket;
+import com.github.netricecake.kakao.packet.inbound.login.CheckInIn;
+import com.github.netricecake.kakao.packet.inbound.login.GetConfIn;
+import com.github.netricecake.kakao.packet.inbound.login.LoginListIn;
+import com.github.netricecake.kakao.packet.inbound.message.WriteIn;
+import com.github.netricecake.kakao.packet.outbound.login.CheckInOut;
+import com.github.netricecake.kakao.packet.outbound.login.LoginListOut;
+import com.github.netricecake.kakao.packet.outbound.etc.PingOut;
+import com.github.netricecake.kakao.packet.outbound.member.KickMemberOut;
+import com.github.netricecake.kakao.packet.outbound.message.WriteOut;
+import com.github.netricecake.kakao.util.BsonUtil;
+import com.github.netricecake.kakao.util.ByteUtil;
+import com.github.netricecake.kakao.util.ImageUtil;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Getter;
@@ -42,7 +51,6 @@ public class TalkClient {
     private final String deviceUuid;
     private final String sessionDir;
 
-    @Getter
     private final Map<Long, ChatRoom> chatRooms = new HashMap<>();
 
     @Getter
@@ -148,22 +156,75 @@ public class TalkClient {
         });
     }
 
-    public boolean sendMessage(long chatId, int type, String message, String extra) {
-        WriteOut wo = new WriteOut();
-        wo.setChatId(chatId);
-        wo.setType(type);
-        wo.setMessage(message);
-        wo.setExtra(extra);
-        WriteIn wi = new WriteIn();
-        wi.fromBson(socket.writeAndRead(new LocoPacket("WRITE", wo.toBson())).getBody());
-        return wi.getStatus() == 0;
+    public ChatRoom getChatRoom(long chatId) {
+        if (chatRooms.containsKey(chatId)) return chatRooms.get(chatId);
+        ChatInfoOut req = new ChatInfoOut(chatId);
+
+        ChatInfoIn res = new ChatInfoIn(socket.writeAndRead(new LocoPacket("CHATINFO", req.toBson())).getBody());
+        if (res.getStatus() != 0) return null;
+
+        GetMemberOut memberReq = new GetMemberOut(chatId);
+        GetMemberIn memberRes = new GetMemberIn(socket.writeAndRead(new LocoPacket("GETMEM", memberReq.toBson())).getBody());
+
+        ChatRoom chatRoom = null;
+        if (res.getType().equals(ChatRoomType.OPEN_CHAT) || res.getType().equals(ChatRoomType.OPEN_DIRECT)) {
+            InfoLinkOut linkReq = new InfoLinkOut(res.getLinkId());
+            InfoLinkIn linkRes = new InfoLinkIn(socket.writeAndRead(new LocoPacket("INFOLINK", linkReq.toBson())).getBody());
+
+            chatRoom = new ChatRoom(this, chatId, res.getType(), linkRes.getName(), res.getLinkId());
+            for (int i = 0; i < memberRes.getMembers().size(); i++) {
+                JsonObject json = memberRes.getMembers().get(i).getAsJsonObject();
+                Member member = new Member(this, chatRoom, json.get("userId").getAsLong(), json.get("type").getAsInt(), json.get("nickName").getAsString(), json.get("pi").getAsString(), json.get("fpi").getAsString(), json.get("opi").getAsString(), json.get("ptp").getAsInt() == 16 ? json.get("pli").getAsLong() : 0, json.get("mt").getAsInt(), json.get("ptp").getAsInt());
+                chatRoom.getMembers().put(member.getUserId(), member);
+            }
+        } else if (res.getType().equals(ChatRoomType.DIRECT_CHAT)) {
+            chatRoom = new ChatRoom(this, chatId, res.getType(), res.getDisplayMembers().get(0).getAsJsonObject().get("nickName").getAsString(), 0);
+            for (int i = 0; i < memberRes.getMembers().size(); i++) {
+                JsonObject json = memberRes.getMembers().get(i).getAsJsonObject();
+                Member member = new Member(this, chatRoom, json.get("userId").getAsLong(), json.get("type").getAsInt(), json.get("nickName").getAsString(), json.get("profileImageUrl").getAsString(), json.get("fullProfileImageUrl").getAsString(), json.get("originalProfileImageUrl").getAsString(), 0, MemberType.MEMBER, 0);
+                chatRoom.getMembers().put(member.getUserId(), member);
+            }
+        } else if (res.getType().equals(ChatRoomType.GROUP_CHAT)) {
+            if (!res.getChatMetas().isEmpty()) {
+                JsonArray chatMetas = res.getChatMetas();
+                chatRoom = new ChatRoom(this, chatId, res.getType(), chatMetas.get(0).getAsJsonObject().get("content").getAsString(), 0);
+            } else {
+                JsonArray displayMembers = res.getDisplayMembers();
+                String name = "";
+                for (int i = 0; i < displayMembers.size(); i++) {
+                    name += displayMembers.get(i).getAsJsonObject().get("nickName").getAsString() + ", ";
+                }
+                chatRoom = new ChatRoom(this, chatId, res.getType(), name, 0);
+            }
+
+            for (int i = 0; i < memberRes.getMembers().size(); i++) {
+                JsonObject json = memberRes.getMembers().get(i).getAsJsonObject();
+                Member member = new Member(this, chatRoom, json.get("userId").getAsLong(), json.get("type").getAsInt(), json.get("nickName").getAsString(), json.get("profileImageUrl").getAsString(), json.get("fullProfileImageUrl").getAsString(), json.get("originalProfileImageUrl").getAsString(), 0, MemberType.MEMBER, 0);
+                chatRoom.getMembers().put(member.getUserId(), member);
+            }
+        }
+
+        return chatRoom;
+    }
+
+    public boolean sendMessage(long chatId, String message, String extra) {
+        WriteOut req = new WriteOut();
+        req.setChatId(chatId);
+        req.setType(MessageType.TEXT);
+        req.setMessage(message);
+        req.setExtra(extra);
+
+        WriteIn res = new WriteIn(socket.writeAndRead(new LocoPacket("WRITE", req.toBson())).getBody());
+        return res.getStatus() == 0;
     }
 
     public boolean sendMessage(long chatId, String message) {
-        return sendMessage(chatId, 1, message, "{}");
+        return sendMessage(chatId, message, "{}");
     }
 
-    public boolean sendJpg(long chatId, byte[] image, String format, int width, int height) {
+    public boolean sendJpg(long chatId, byte[] image) {
+        ImageUtil.ImageMeta meta = ImageUtil.getImageMeta(image);
+        if (!meta.isValidJpeg()) return false;
         LocoSocket postSocket = null;
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-1");
@@ -171,8 +232,7 @@ public class TalkClient {
             so.setChatId(chatId);
             so.setSize(image.length);
             so.setCheckSum(ByteUtil.byteArrayToHexString(md.digest(image)));
-            ShipIn si = new ShipIn();
-            si.fromBson(socket.writeAndRead(new LocoPacket("SHIP", so.toBson())).getBody());
+            ShipIn si = new ShipIn(socket.writeAndRead(new LocoPacket("SHIP", so.toBson())).getBody());
             if (si.getStatus() != 0) return false;
 
             final CompletableFuture<Integer> future = new CompletableFuture<>();
@@ -191,11 +251,10 @@ public class TalkClient {
             po.setKey(si.getKey());
             po.setSize(image.length);
             po.setChatId(chatId);
-            po.setWidth(width);
-            po.setHeight(height);
+            po.setWidth(meta.getWidth());
+            po.setHeight(meta.getHeight());
 
-            PostIn pi = new PostIn();
-            pi.fromBson(postSocket.writeAndRead(new LocoPacket("POST", po.toBson())).getBody());
+            PostIn pi = new PostIn(postSocket.writeAndRead(new LocoPacket("POST", po.toBson())).getBody());
             if (pi.getStatus() != 0) {
                 postSocket.close();
                 return false;
@@ -214,7 +273,33 @@ public class TalkClient {
         return false;
     }
 
-    public long getUserId() {
+    public boolean reply(Message target, String message) {
+        JsonObject extraObject = new JsonObject();
+        extraObject.addProperty("src_logId", target.getLogId());
+        extraObject.addProperty("src_userId", target.getAuthor().getUserId());
+        extraObject.addProperty("src_message", target.getMessage());
+        extraObject.addProperty("src_type", target.getType());
+        extraObject.addProperty("src_linkId", target.getChatRoom().getLinkId());
+
+        WriteOut req = new WriteOut();
+        req.setChatId(target.getChatRoom().getChatId());
+        req.setMessage(message);
+        req.setType(MessageType.REPLY);
+        req.setExtra(extraObject.toString());
+
+        JsonObject res = socket.writeAndRead(new LocoPacket("WRITE", req.toBson())).getBodyJson();
+        return res.get("status").getAsInt() == 0;
+    }
+
+    public boolean kickMember(long chatId, long linkId, long memberId) {
+        KickMemberOut req = new KickMemberOut(chatId, linkId, memberId);
+
+        JsonObject res = socket.writeAndRead(new LocoPacket("KICKMEM", req.toBson())).getBodyJson();
+        // 채팅 로그 저장할거면 이거도 처리
+        return res.get("status").getAsInt() == 0;
+    }
+
+    public long getMyUserId() {
         return loginData.userId;
     }
 

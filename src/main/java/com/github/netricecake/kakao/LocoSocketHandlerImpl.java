@@ -1,21 +1,15 @@
 package com.github.netricecake.kakao;
 
+import com.github.netricecake.kakao.packet.inbound.member.*;
 import com.github.netricecake.kakao.structs.ChatRoom;
 import com.github.netricecake.kakao.structs.Member;
+import com.github.netricecake.kakao.structs.MemberType;
 import com.github.netricecake.kakao.structs.Message;
-import com.github.netricecake.loco.LocoPacket;
-import com.github.netricecake.loco.LocoSocketHandler;
-import com.github.netricecake.loco.packet.inbound.member.*;
-import com.github.netricecake.loco.packet.inbound.message.MessageIn;
-import com.github.netricecake.loco.packet.inbound.room.ChatInfoIn;
-import com.github.netricecake.loco.packet.inbound.room.InfoLinkIn;
-import com.github.netricecake.loco.packet.outbound.member.MemberOut;
-import com.github.netricecake.loco.packet.outbound.room.ChatInfoOut;
-import com.github.netricecake.loco.packet.outbound.member.GetMemberOut;
-import com.github.netricecake.loco.packet.outbound.room.InfoLinkOut;
-import com.github.netricecake.loco.packet.outbound.message.MessageOut;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.github.netricecake.kakao.loco.LocoPacket;
+import com.github.netricecake.kakao.loco.LocoSocketHandler;
+import com.github.netricecake.kakao.packet.inbound.message.MessageIn;
+import com.github.netricecake.kakao.packet.outbound.member.MemberOut;
+import com.github.netricecake.kakao.packet.outbound.message.MessageOut;
 
 public class LocoSocketHandlerImpl extends LocoSocketHandler {
 
@@ -30,100 +24,42 @@ public class LocoSocketHandlerImpl extends LocoSocketHandler {
         if (packet.getMethod().equals("MSG")) {
             client.getSocket().write(new LocoPacket(packet.getPacketId(), "MSG", new MessageOut().toBson()));
 
-            MessageIn in = new MessageIn();
-            in.fromBson(packet.getBody());
-            checkRoom(in.getChatId());
-            checkMember(in.getChatId(), in.getAuthorId());
+            MessageIn in = new MessageIn(packet.getBody());
+            ChatRoom chatRoom = client.getChatRoom(in.getChatId());
+            if (chatRoom == null) return;
+            Member member = chatRoom.getMembers().get(in.getAuthorId());
 
-            ChatRoom room = client.getChatRooms().get(in.getChatId());
-            Member member = room.getMembers().get(in.getAuthorId());
-
-            Message msg = new Message(in.getLogId(), room, member, in.getType(), in.getMessage(), in.getAttachment());
+            Message msg = new Message(client, chatRoom, in.getLogId(), member, in.getType(), in.getSendAt(), in.getMessage(), in.getAttachment());
             Thread.ofVirtual().start(() -> {
                 client.getTalkHandler().onMessage(msg);
             });
         } else if (packet.getMethod().equals("NEWMEM")) {
-            NewMemIn in = new NewMemIn();
-            in.fromBson(packet.getBody());
-            checkRoom(in.getChatId());
-            checkMember(in.getChatId(), in.getUserId());
+            NewMemIn res = new NewMemIn(packet.getBody());
+            ChatRoom chatRoom = client.getChatRoom(res.getChatId());
+            if (chatRoom == null) return;
+            MemberOut mo = new MemberOut(res.getChatId(), res.getUserId());
+            MemberIn mi = new MemberIn(client.getSocket().writeAndRead(new LocoPacket("MEMBER", mo.toBson())).getBody());
+            chatRoom.getMembers().put(res.getUserId(), new Member(client, chatRoom, res.getUserId(), mi.getType(), mi.getNickName(), mi.getProfileImageUrl(), mi.getFullProfileImageUrl(), mi.getOriginalProfileImageUrl(), mi.getProfileLinkId(), mi.getMemberType(), mi.getProfileType()));
 
-            ChatRoom room = client.getChatRooms().get(in.getChatId());
-            if (!room.getType().equals("OM")) return;
             Thread.ofVirtual().start(() -> {
-                client.getTalkHandler().onNewMember(room, room.getMembers().get(in.getUserId()));
+                client.getTalkHandler().onNewMember(chatRoom, chatRoom.getMembers().get(res.getUserId()));
             });
         } else if (packet.getMethod().equals("DELMEM")) {
-            DelMemIn in = new DelMemIn();
-            in.fromBson(packet.getBody());
-            checkRoom(in.getChatId());
+            DelMemIn in = new DelMemIn(packet.getBody());
+            ChatRoom chatRoom = client.getChatRoom(in.getChatId());
+            if (chatRoom == null) return;
+            chatRoom.getMembers().remove(in.getUserId());
 
-            ChatRoom room = client.getChatRooms().get(in.getChatId());
-            if (!room.getType().equals("OM")) return;
             Thread.ofVirtual().start(() -> {
-                client.getTalkHandler().onDelMember(room, new Member(in.getUserId(), in.getNickname(), 2));
+                client.getTalkHandler().onDelMember(chatRoom, in.getUserId(), in.getNickname());
             });
-            room.getMembers().remove(in.getUserId());
         } else if (packet.getMethod().equals("SYNCLINKPF")) {
-            SyncLinkPfIn si = new SyncLinkPfIn();
-            si.fromBson(packet.getBody());
-            ChatRoom room = client.getChatRooms().get(si.getChatId());
-            room.getMembers().remove(si.getUserId());
-            Member member = new Member(si.getUserId(), si.getNickName(), 2);
-            room.getMembers().put(si.getUserId(), member);
-        }
-    }
-
-    private void checkRoom(long chatId) {
-        if (!client.getChatRooms().containsKey(chatId)) {
-            ChatInfoOut co = new ChatInfoOut(chatId);
-            ChatInfoIn ci = new ChatInfoIn();
-            ci.fromBson(client.getSocket().writeAndRead(new LocoPacket("CHATINFO", co.toBson())).getBody());
-            ChatRoom room = new ChatRoom();
-            room.setChatId(chatId);
-            room.setType(ci.getType());
-            room.setLinkId(ci.getLinkId());
-            GetMemberOut gmo = new GetMemberOut(chatId);
-            GetMemberIn gmi = new GetMemberIn();
-            gmi.fromBson(client.getSocket().writeAndRead(new LocoPacket("GETMEM", gmo.toBson())).getBody());
-            for (int i = 0; i < gmi.getMembers().size(); i++) {
-                JsonObject json = gmi.getMembers().get(i).getAsJsonObject();
-                int type = json.get("mt") != null ? json.get("mt").getAsInt() : 2;
-                Member member = new Member(json.get("userId").getAsLong(), json.get("nickName").getAsString(), type);
-                room.getMembers().put(member.getId(), member);
-            }
-
-            if (ci.getType().equals("OM")) {
-                InfoLinkOut lo =  new InfoLinkOut(ci.getLinkId());
-                InfoLinkIn li = new InfoLinkIn();
-                li.fromBson(client.getSocket().writeAndRead(new LocoPacket("INFOLINK", lo.toBson())).getBody());
-                room.setName(li.getName());
-            } else if (ci.getType().equals("MultiChat")) {
-                if (!ci.getChatMetas().isEmpty()) {
-                    JsonArray chatMetas = ci.getChatMetas();
-                    room.setName(chatMetas.get(0).getAsJsonObject().get("content").getAsString());
-                } else {
-                    JsonArray displayMembers = ci.getDisplayMembers();
-                    String name = "";
-                    for (int i = 0; i < displayMembers.size(); i++) {
-                        name += displayMembers.get(i).getAsJsonObject().get("nickName").getAsString() + ", ";
-                    }
-                    room.setName(name);
-                }
-            } else if (ci.getType().equals("DirectChat")) {
-                room.setName(ci.getDisplayMembers().get(0).getAsJsonObject().get("nickName").getAsString());
-            }
-            client.getChatRooms().put(chatId, room);
-        }
-    }
-
-    private void checkMember(long chatId, long memberId) {
-        ChatRoom room = client.getChatRooms().get(chatId);
-        if (!room.getMembers().containsKey(memberId)) {
-            MemberOut mo = new MemberOut(chatId, memberId);
-            MemberIn mi = new MemberIn();
-            mi.fromBson(client.getSocket().writeAndRead(new LocoPacket("MEMBER", mo.toBson())).getBody());
-            room.getMembers().put(memberId, new Member(memberId, mi.getNickName(), mi.getMemberType()));
+            SyncLinkPfIn res = new SyncLinkPfIn(packet.getBody());
+            ChatRoom chatRoom = client.getChatRoom(res.getChatId());
+            if (chatRoom == null) return;
+            chatRoom.getMembers().remove(res.getUserId());
+            Member member = new Member(client, chatRoom, res.getUserId(), 1000, res.getNickName(), res.getProfileImageUrl(), res.getFullProfileImageUrl(), res.getOriginalProfileImageUrl(), res.getProfileLinkId(), MemberType.MEMBER, res.getProfileType());
+            chatRoom.getMembers().put(res.getUserId(), member);
         }
     }
 
