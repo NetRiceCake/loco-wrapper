@@ -174,7 +174,7 @@ public class TalkClient {
             chatRoom = new ChatRoom(this, chatId, res.getType(), linkRes.getName(), res.getLinkId());
             for (int i = 0; i < memberRes.getMembers().size(); i++) {
                 JsonObject json = memberRes.getMembers().get(i).getAsJsonObject();
-                Member member = new Member(this, chatRoom, json.get("userId").getAsLong(), json.get("type").getAsInt(), json.get("nickName").getAsString(), json.get("pi").getAsString(), json.get("fpi").getAsString(), json.get("opi").getAsString(), json.get("ptp").getAsInt() == 16 ? json.get("pli").getAsLong() : 0, json.get("mt").getAsInt(), json.get("ptp").getAsInt());
+                Member member = new Member(this, chatRoom, json.get("userId").getAsLong(), json.get("type").getAsInt(), json.get("nickName").getAsString(), json.get("pi").getAsString(), json.get("fpi").getAsString(), json.get("opi").getAsString(), json.get("pli") != null ? json.get("pli").getAsLong() : 0, json.get("mt").getAsInt(), json.get("ptp").getAsInt());
                 chatRoom.getMembers().put(member.getUserId(), member);
             }
         } else if (res.getType().equals(ChatRoomType.DIRECT_CHAT)) {
