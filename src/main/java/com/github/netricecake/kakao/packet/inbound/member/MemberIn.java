@@ -38,7 +38,7 @@ public class MemberIn extends InboundPacket {
         if (type == 1000) {
             memberType = json.get("mt").getAsInt();
             profileType = json.get("ptp").getAsInt();
-            profileLinkId = profileType == 16 ? json.get("pli").getAsLong() : 0;
+            profileLinkId = json.get("pli") != null ? json.get("pli").getAsLong() : 0;
         }
     }
 
