@@ -68,8 +68,8 @@ public class LocoCodec extends MessageToMessageCodec<byte[], LocoPacket> {
             }
             if (currentLocoPacket.getBodyLength() > buffer.length) break;
             byte[] body = ByteUtil.sliceBytes(buffer, 0, currentLocoPacket.getBodyLength());
-            System.out.println(currentLocoPacket.getMethod());
-            System.out.println(BsonUtil.bsonToJson(body));
+            //System.out.println(currentLocoPacket.getMethod());
+            //System.out.println(BsonUtil.bsonToJson(body));
             buffer = ByteUtil.sliceBytes(buffer, currentLocoPacket.getBodyLength(), buffer.length - currentLocoPacket.getBodyLength());
             currentLocoPacket.setBody(body);
             if (waitList.containsKey(currentLocoPacket.getPacketId())) {
