@@ -67,9 +67,7 @@ public class KakaoApi {
                 .addHeader("A", AUTH_HEADER_AGENT);
 
         Response response = client.newCall(builder.build()).execute();
-        String gg = response.body().string();
-        System.out.println(gg);
-        JsonObject jsonObject = JsonParser.parseString(gg).getAsJsonObject();
+        JsonObject jsonObject = JsonParser.parseString(response.body().string()).getAsJsonObject();
         int status = jsonObject.get("status").getAsInt();
 
         // 12 비번 틀림 30 이메일 틀림
