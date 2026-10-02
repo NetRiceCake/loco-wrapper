@@ -10,6 +10,9 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.bytes.ByteArrayDecoder;
 import io.netty.handler.codec.bytes.ByteArrayEncoder;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import lombok.Getter;
 
 import java.io.IOException;
@@ -54,6 +57,11 @@ public class LocoSocket {
         try {
             eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
             Bootstrap bootstrap = new Bootstrap();
+
+
+            SslContext sslCtx = SslContextBuilder.forClient()
+                    .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                    .build();
             bootstrap.remoteAddress(new InetSocketAddress(ip, port))
                     .group(eventLoopGroup)
                     .channel(NioSocketChannel.class)
@@ -61,14 +69,15 @@ public class LocoSocket {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
                             ChannelPipeline pipeline = socketChannel.pipeline();
+                            pipeline.addLast(sslCtx.newHandler(socketChannel.alloc(), ip, port));
                             pipeline.addLast(new ByteArrayEncoder());
                             pipeline.addLast(new ByteArrayDecoder());
                         }
                     });
             channel = bootstrap.connect().sync().channel();
             alive = true;
-            channel.writeAndFlush(cryptoManager.generateHandshakeMessage()).sync();
-            channel.pipeline().addLast(new SecureLayerCodec(cryptoManager));
+            //channel.writeAndFlush(cryptoManager.generateHandshakeMessage()).sync();
+            //channel.pipeline().addLast(new SecureLayerCodec(cryptoManager));
             channel.pipeline().addLast(new LocoCodec(locoSocketHandler, waitList, handlerLoop));
             handlerLoop.execute(locoSocketHandler::onConnect);
 

@@ -25,7 +25,7 @@ public class KakaoApi {
 
 
     public final static String AGENT = "android";
-    public final static String VERSION = "25.9.2";
+    public final static String VERSION = "26.8.2";
     public final static String OS_VERSION = "13";
     public final static String API_LEVEL = "33";
     public final static String LANGUAGE = "ko";
@@ -67,7 +67,9 @@ public class KakaoApi {
                 .addHeader("A", AUTH_HEADER_AGENT);
 
         Response response = client.newCall(builder.build()).execute();
-        JsonObject jsonObject = JsonParser.parseString(response.body().string()).getAsJsonObject();
+        String gg = response.body().string();
+        System.out.println(gg);
+        JsonObject jsonObject = JsonParser.parseString(gg).getAsJsonObject();
         int status = jsonObject.get("status").getAsInt();
 
         // 12 비번 틀림 30 이메일 틀림
@@ -77,7 +79,7 @@ public class KakaoApi {
             LoginData data = new LoginData();
             data.userId = jsonObject.get("userId").getAsLong();
             data.countryIso = jsonObject.get("countryIso").getAsString();
-            data.countryCode = jsonObject.get("countryCode").getAsString();
+            data.countryCode = LANGUAGE; // 서버에서 이 값을 안넘겨줍니다. 우선 기본값으로 대체
             data.accountId = jsonObject.get("accountId").getAsLong();
             data.accessToken = jsonObject.get("access_token").getAsString();
             data.refreshToken = jsonObject.get("refresh_token").getAsString();
@@ -196,7 +198,7 @@ public class KakaoApi {
 
     public static String calculateXVC(String email) {
         try {
-            String str = String.format("BARD|%s|DANTE|%s|SIAN", AUTH_USER_AGENT, email);
+            String str = String.format("ALBUS|%s|IAN|%s|SEOGI", AUTH_USER_AGENT, email);
             MessageDigest digest = MessageDigest.getInstance("SHA-512");
             digest.reset();
             digest.update(str.getBytes());
