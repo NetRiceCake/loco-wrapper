@@ -24,25 +24,23 @@ import java.util.Map;
 public class KakaoApi {
 
 
-    public final static String AGENT = "android";
-    public final static String VERSION = "26.8.2";
-    public final static String OS_VERSION = "13";
-    public final static String API_LEVEL = "33";
+    public final static String AGENT = "mac";
+    public final static String VERSION = "26.8.0";
+    public final static String OS_VERSION = "27.0.1";
     public final static String LANGUAGE = "ko";
 
     public final static String PROTOCOL_VERSION = "1";
     public final static int NETWORK_TYPE = 0; // 0 : WIFI, 3: Cellular
-    public final static String MCCMNC = "45006"; // 앞자리 세자리(한국) 450 고정, 뒤에 두자리 SKT: 05 KT: 08 LGU+: 06
+    public final static String MCCMNC = "999"; // 앞자리 세자리(한국) 450 고정, 뒤에 두자리 SKT: 05 KT: 08 LGU+: 06
 
-    public final static String ALLOW_LIST_URL = "https://katalk.kakao.com/android/account/allowlist.json";
-    public final static String LOGIN_URL = "https://katalk.kakao.com/android/account/login.json";
-    public final static String PASSCODE_GENERATE_URL = "https://katalk.kakao.com/android/account/passcodeLogin/generate";
-    public final static String REGISTER_DEVICE_URL = "https://katalk.kakao.com/android/account/passcodeLogin/registerDevice";
-    public final static String CANCEL_REGISTER_URL = "https://katalk.kakao.com/android/account/passcodeLogin/cancel";
+    public final static String LOGIN_URL = "https://katalk.kakao.com/mac/account/login.json";
+    public final static String PASSCODE_GENERATE_URL = "https://katalk.kakao.com/mac/account/passcodeLogin/generate";
+    public final static String REGISTER_DEVICE_URL = "https://katalk.kakao.com/mac/account/passcodeLogin/registerDevice";
+    public final static String CANCEL_REGISTER_URL = "https://katalk.kakao.com/mac/account/passcodeLogin/cancel";
     public final static String BOOKING_URL = "booking-loco.kakao.com";
     public final static int BOOKING_PORT = 443;
 
-    public final static String AUTH_USER_AGENT = String.format("KT/%s An/%s %s", VERSION, OS_VERSION, LANGUAGE);
+    public final static String AUTH_USER_AGENT = String.format("KT/%s Mc/%s %s", VERSION, OS_VERSION, LANGUAGE);
     public final static String AUTH_HEADER_AGENT = String.format("%s/%s/%s", AGENT, VERSION, LANGUAGE);
 
     public final static int UUID_LENGTH = 64;
@@ -53,21 +51,24 @@ public class KakaoApi {
 
     public static LoginData loginRequest(String email, String password, String deviceName, String deviceUuid) throws IOException, InvalidDeviceNameException, InvalidDeviceUUIDException, BadCredentialsException, UnregisteredDeviceException {
         if (deviceUuid == null || deviceUuid.length() != UUID_LENGTH) throw new InvalidDeviceUUIDException();
-        if (!checkAllowedDevice(deviceName)) throw new InvalidDeviceNameException();
         RequestBody body = new FormBody.Builder().add("password", password)
                 .add("device_name", deviceName)
                 .add("forced", "false")
                 .add("permanent", "true")
                 .add("email", email)
-                .add("device_uuid", deviceUuid).build();
+                .add("device_uuid", deviceUuid)
+                .add("auto_login", "false")
+                .add("os_version", OS_VERSION).build();
         Request.Builder builder = new Request.Builder().url(LOGIN_URL).post(body);
-        builder.addHeader("X-VC", calculateXVC(email))
+        builder.addHeader("X-VC", calculateXVC(email, deviceUuid))
                 .addHeader("Accept-Language", LANGUAGE)
                 .addHeader("User-Agent", AUTH_USER_AGENT)
                 .addHeader("A", AUTH_HEADER_AGENT);
 
         Response response = client.newCall(builder.build()).execute();
-        JsonObject jsonObject = JsonParser.parseString(response.body().string()).getAsJsonObject();
+        String gg = response.body().string();
+        System.out.println(gg);
+        JsonObject jsonObject = JsonParser.parseString(gg).getAsJsonObject();
         int status = jsonObject.get("status").getAsInt();
 
         // 12 비번 틀림 30 이메일 틀림
@@ -102,10 +103,10 @@ public class KakaoApi {
         deviceObject.addProperty("name", device_name);
         deviceObject.addProperty("uuid", deviceUuid);
         deviceObject.addProperty("model", device_name);
-        deviceObject.addProperty("osVersion", API_LEVEL);
+        deviceObject.addProperty("osVersion", OS_VERSION);
         jsonObject.add("device", deviceObject);
 
-        Request.Builder builder = generateHeader(email).url(PASSCODE_GENERATE_URL).post(RequestBody.create(gson.toJson(jsonObject), MediaType.parse("application/json; charset=utf-8")));
+        Request.Builder builder = generateHeader(email, deviceUuid).url(PASSCODE_GENERATE_URL).post(RequestBody.create(gson.toJson(jsonObject), MediaType.parse("application/json; charset=utf-8")));
         String json = client.newCall(builder.build()).execute().body().string();
         JsonObject body = JsonParser.parseString(json).getAsJsonObject();
         return Map.entry(body.get("passcode").getAsString(), body.get("remainingSeconds").getAsInt());
@@ -119,7 +120,7 @@ public class KakaoApi {
         deviceObject.addProperty("uuid", deviceUuid);
         jsonObject.add("device", deviceObject);
 
-        Request.Builder builder = generateHeader(email).url(REGISTER_DEVICE_URL).post(RequestBody.create(gson.toJson(jsonObject), MediaType.parse("application/json; charset=utf-8")));
+        Request.Builder builder = generateHeader(email, deviceUuid).url(REGISTER_DEVICE_URL).post(RequestBody.create(gson.toJson(jsonObject), MediaType.parse("application/json; charset=utf-8")));
 
         Request request = builder.build();
         try {
@@ -132,8 +133,9 @@ public class KakaoApi {
                 int interval = resBody.get("nextRequestIntervalInSeconds").getAsInt();
                 remainTime = remain - interval;
                 Thread.sleep((long) interval * 1000);
+                System.out.println(remainTime + "초 남음");
             } while(remainTime > 0);
-            builder = generateHeader(email).url(CANCEL_REGISTER_URL).post(RequestBody.create(gson.toJson(jsonObject), MediaType.parse("application/json; charset=utf-8")));
+            builder = generateHeader(email, deviceUuid).url(CANCEL_REGISTER_URL).post(RequestBody.create(gson.toJson(jsonObject), MediaType.parse("application/json; charset=utf-8")));
             client.newCall(builder.build()).execute();
         } catch (Exception e) {}
         return false;
@@ -172,31 +174,18 @@ public class KakaoApi {
         }
     }
 
-    public static boolean checkAllowedDevice(String deviceName) throws IOException {
-        Request.Builder builder = new Request.Builder().url(String.format("%s?model_name=%s", ALLOW_LIST_URL, deviceName)).get();
-        builder.addHeader("Content-Type", "application/x-www-form-urlencoded");
-        builder.addHeader("Accept-Language", LANGUAGE);
-        builder.addHeader("User-Agent", AUTH_USER_AGENT);
-        builder.addHeader("A", AUTH_HEADER_AGENT);
-        builder.addHeader("Accept-Encoding", "gzip");
-
-        Request request = builder.build();
-
-        return JsonParser.parseString(client.newCall(request).execute().body().string()).getAsJsonObject().get("allowlisted").getAsBoolean();
-    }
-
-    public static Request.Builder generateHeader(String email) {
+    public static Request.Builder generateHeader(String email, String uuid) {
         Request.Builder builder = new Request.Builder();
-        builder.addHeader("X-VC", calculateXVC(email))
+        builder.addHeader("X-VC", calculateXVC(email, uuid))
             .addHeader("User-Agent", AUTH_USER_AGENT)
             .addHeader("A", AUTH_HEADER_AGENT);
 
         return builder;
     }
 
-    public static String calculateXVC(String email) {
+    public static String calculateXVC(String email, String uuid) {
         try {
-            String str = String.format("ALBUS|%s|IAN|%s|SEOGI", AUTH_USER_AGENT, email);
+            String str = String.format("ELBAF|%s|%s|INIMEG|%s", email, uuid, AUTH_USER_AGENT);
             MessageDigest digest = MessageDigest.getInstance("SHA-512");
             digest.reset();
             digest.update(str.getBytes());
